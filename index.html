@@ -1,57 +1,449 @@
 <!DOCTYPE html>
-<html lang="ja"><head>
+<html lang="ja">
+<head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>タスク管理</title>
 <style>
-body{font-family:sans-serif;background:#f4f4f4;margin:0;padding:12px}
-h2{margin:8px 0}
-#newTask{width:68%;padding:10px;font-size:16px}
-button{padding:10px 14px;font-size:16px}
-.card{background:#fff;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 2px 6px rgba(0,0,0,.15);position:relative;touch-action:pan-y}
-.title{font-size:20px;font-weight:bold}
-.detail{display:none;margin-top:8px;color:#444}
-.delete{display:none;position:absolute;right:10px;top:10px;background:#d33;color:#fff}
-</style></head>
+:root{
+  --green:#2f9e44;
+  --green-dark:#237a34;
+  --red:#d64545;
+  --red-dark:#a92f2f;
+  --bg:#eef3ef;
+  --card:#ffffff;
+  --text:#1f2937;
+  --muted:#6b7280;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+}
+header{
+  position:sticky;top:0;z-index:10;
+  background:#fff;
+  padding:14px 14px 10px;
+  box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+h1{font-size:22px;margin:0 0 10px}
+.tabs{display:flex;gap:8px}
+.tab{
+  flex:1;border:none;border-radius:10px;padding:11px 8px;
+  font-weight:700;background:#e5e7eb;color:#374151;
+}
+.tab.active{background:#111827;color:#fff}
+main{padding:14px 14px 90px}
+.panel{display:none}
+.panel.active{display:block}
+.form{
+  background:#fff;border-radius:14px;padding:14px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:14px
+}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}
+input,textarea,select{
+  width:100%;padding:11px;border:1px solid #cfd5dc;border-radius:10px;
+  font-size:16px;background:#fff
+}
+textarea{min-height:76px;resize:vertical}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.primary{
+  width:100%;margin-top:12px;border:none;border-radius:11px;
+  padding:13px;font-size:16px;font-weight:800;background:#111827;color:#fff
+}
+.task-list{display:flex;flex-direction:column;gap:10px}
+.task-wrap{position:relative;overflow:hidden;border-radius:14px}
+.delete-bg{
+  position:absolute;inset:0 0 0 auto;width:96px;
+  display:flex;align-items:center;justify-content:center;
+  background:#991b1b;color:#fff;font-weight:800
+}
+.task-card{
+  position:relative;z-index:2;
+  border:none;width:100%;text-align:left;color:#fff;
+  padding:17px 16px;border-radius:14px;
+  transition:transform .18s ease;
+  box-shadow:0 3px 10px rgba(0,0,0,.12)
+}
+.task-card.green{background:linear-gradient(135deg,var(--green),var(--green-dark))}
+.task-card.red{background:linear-gradient(135deg,var(--red),var(--red-dark))}
+.task-title{font-size:20px;font-weight:800;line-height:1.35}
+.task-meta{font-size:13px;opacity:.95;margin-top:6px}
+.detail{
+  display:none;margin-top:12px;padding-top:12px;
+  border-top:1px solid rgba(255,255,255,.35);font-size:15px;line-height:1.7
+}
+.task-card.open .detail{display:block}
+.actions{display:flex;gap:8px;margin-top:10px}
+.small-btn{
+  flex:1;border:none;border-radius:9px;padding:9px;font-weight:800
+}
+.complete{background:#fff;color:#111827}
+.edit{background:rgba(255,255,255,.22);color:#fff}
+.empty{
+  background:#fff;border-radius:14px;padding:24px;text-align:center;color:var(--muted)
+}
+.notice{
+  font-size:13px;color:var(--muted);line-height:1.6;margin:8px 2px 14px
+}
+.repeat-item{
+  background:#fff;border-radius:12px;padding:13px;margin-bottom:10px;
+  box-shadow:0 2px 8px rgba(0,0,0,.07)
+}
+.repeat-title{font-weight:800}
+.repeat-meta{font-size:13px;color:var(--muted);margin-top:4px}
+.repeat-actions{display:flex;gap:8px;margin-top:10px}
+.repeat-actions button{
+  flex:1;border:none;border-radius:8px;padding:9px;font-weight:700
+}
+.danger{background:#fee2e2;color:#991b1b}
+.secondary{background:#e5e7eb;color:#111827}
+.badge{
+  display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;
+  font-size:11px;font-weight:800;background:rgba(255,255,255,.25)
+}
+</style>
+</head>
 <body>
-<h2>タスク管理</h2>
-<input id="newTask" placeholder="タスク名">
-<button onclick="addTask()">追加</button>
-<div id="list"></div>
+<header>
+  <h1>タスク管理</h1>
+  <div class="tabs">
+    <button class="tab active" data-tab="tasks">タスク</button>
+    <button class="tab" data-tab="add">追加</button>
+    <button class="tab" data-tab="repeat">週例・月例</button>
+  </div>
+</header>
+
+<main>
+<section id="tasks" class="panel active">
+  <div class="notice">
+    通常タスクは期限の14日前から赤色になります。週例・月例は、その回のタスクが出現してから3日経過すると赤色になります。赤色のタスクは上に表示されます。
+  </div>
+  <div id="taskList" class="task-list"></div>
+</section>
+
+<section id="add" class="panel">
+  <div class="form">
+    <h2>通常タスクを追加</h2>
+    <label>タスク名</label>
+    <input id="titleInput" placeholder="例：水質検査結果の確認">
+    <label>期限</label>
+    <input id="dueInput" type="date">
+    <label>補足説明</label>
+    <textarea id="noteInput" placeholder="必要な手順や注意点など"></textarea>
+    <button class="primary" id="addTaskBtn">追加する</button>
+  </div>
+</section>
+
+<section id="repeat" class="panel">
+  <div class="form">
+    <h2>週例・月例を登録</h2>
+    <label>タスク名</label>
+    <input id="repeatTitle" placeholder="例：週報作成">
+    <label>種類</label>
+    <select id="repeatType">
+      <option value="weekly">週例</option>
+      <option value="monthly">月例</option>
+    </select>
+
+    <div id="weeklyFields">
+      <label>出現する曜日</label>
+      <select id="weekday">
+        <option value="1">月曜日</option>
+        <option value="2">火曜日</option>
+        <option value="3">水曜日</option>
+        <option value="4">木曜日</option>
+        <option value="5">金曜日</option>
+        <option value="6">土曜日</option>
+        <option value="0">日曜日</option>
+      </select>
+    </div>
+
+    <div id="monthlyFields" style="display:none">
+      <label>出現する日</label>
+      <select id="monthday"></select>
+    </div>
+
+    <label>補足説明</label>
+    <textarea id="repeatNote" placeholder="任意"></textarea>
+    <button class="primary" id="addRepeatBtn">登録する</button>
+  </div>
+
+  <div id="repeatList"></div>
+</section>
+</main>
+
 <script>
-let tasks=JSON.parse(localStorage.getItem("tasks")||"[]");
-function save(){localStorage.setItem("tasks",JSON.stringify(tasks));}
-function render(){
- const list=document.getElementById("list");list.innerHTML="";
- tasks.forEach((t,i)=>{
-  const c=document.createElement("div");
-  c.className="card";
-  c.innerHTML='<div class="title">'+t.name+'</div>'
-   +'<button class="delete">削除</button>'
-   +'<div class="detail">期限: '+(t.due||"未設定")+'<br>補足: '+(t.note||"なし")+'</div>';
-  const d=c.querySelector(".detail");
-  c.querySelector(".title").onclick=()=>d.style.display=d.style.display=="block"?"none":"block";
-  let sx=0;
-  c.addEventListener("touchstart",e=>sx=e.touches[0].clientX);
-  c.addEventListener("touchend",e=>{
-    if(sx-e.changedTouches[0].clientX>60){
-      const b=c.querySelector(".delete");
-      b.style.display="block";
-      b.onclick=()=>{tasks.splice(i,1);save();render();}
+const TASKS_KEY="taskToolTasksV2";
+const REPEATS_KEY="taskToolRepeatsV2";
+
+let tasks=JSON.parse(localStorage.getItem(TASKS_KEY)||"[]");
+let repeats=JSON.parse(localStorage.getItem(REPEATS_KEY)||"[]");
+
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,"0");
+const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parseLocal=s=>{
+  const [y,m,d]=s.split("-").map(Number);
+  return new Date(y,m-1,d);
+};
+const daysBetween=(a,b)=>{
+  const ms=24*60*60*1000;
+  const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());
+  const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());
+  return Math.floor((aa-bb)/ms);
+};
+function save(){
+  localStorage.setItem(TASKS_KEY,JSON.stringify(tasks));
+  localStorage.setItem(REPEATS_KEY,JSON.stringify(repeats));
+}
+function showTab(name){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===name));
+}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+function getWeekStart(d){
+  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const day=x.getDay();
+  const diff=(day===0?-6:1-day);
+  x.setDate(x.getDate()+diff);
+  return x;
+}
+function generateRecurring(){
+  const today=new Date();
+  const todayKey=dateKey(today);
+  let changed=false;
+
+  repeats.forEach(r=>{
+    if(r.type==="weekly"){
+      const weekStart=getWeekStart(today);
+      const target=new Date(weekStart);
+      const offset=(Number(r.weekday)+6)%7;
+      target.setDate(weekStart.getDate()+offset);
+      if(target<=today){
+        const occurrenceKey=`${r.id}-${dateKey(target)}`;
+        const exists=tasks.some(t=>t.occurrenceKey===occurrenceKey);
+        if(!exists){
+          tasks.push({
+            id:crypto.randomUUID(),
+            title:r.title,
+            due:"",
+            note:r.note||"",
+            completed:false,
+            kind:"recurring",
+            repeatType:"weekly",
+            appearedAt:dateKey(target),
+            occurrenceKey
+          });
+          changed=true;
+        }
+      }
+    }else{
+      const day=Math.min(Number(r.monthday),new Date(today.getFullYear(),today.getMonth()+1,0).getDate());
+      const target=new Date(today.getFullYear(),today.getMonth(),day);
+      if(target<=today){
+        const occurrenceKey=`${r.id}-${dateKey(target)}`;
+        const exists=tasks.some(t=>t.occurrenceKey===occurrenceKey);
+        if(!exists){
+          tasks.push({
+            id:crypto.randomUUID(),
+            title:r.title,
+            due:"",
+            note:r.note||"",
+            completed:false,
+            kind:"recurring",
+            repeatType:"monthly",
+            appearedAt:dateKey(target),
+            occurrenceKey
+          });
+          changed=true;
+        }
+      }
     }
   });
-  list.appendChild(c);
- });
+  if(changed)save();
 }
-function addTask(){
- const n=document.getElementById("newTask").value.trim();
- if(!n)return;
- const due=prompt("期限 (任意)");
- const note=prompt("補足説明 (任意)");
- tasks.push({name:n,due:due||"",note:note||""});
- save();render();
- document.getElementById("newTask").value="";
+function isRed(t){
+  const today=new Date();
+  if(t.kind==="recurring"){
+    return daysBetween(today,parseLocal(t.appearedAt))>=3;
+  }
+  if(!t.due)return false;
+  return daysBetween(parseLocal(t.due),today)<=14;
 }
-render();
+function renderTasks(){
+  generateRecurring();
+  const list=$("taskList");
+  const active=tasks.filter(t=>!t.completed);
+  active.sort((a,b)=>{
+    const ar=isRed(a)?1:0, br=isRed(b)?1:0;
+    if(ar!==br)return br-ar;
+    const ad=a.due?parseLocal(a.due).getTime():Infinity;
+    const bd=b.due?parseLocal(b.due).getTime():Infinity;
+    return ad-bd;
+  });
+
+  if(!active.length){
+    list.innerHTML='<div class="empty">未完了のタスクはありません</div>';
+    return;
+  }
+  list.innerHTML="";
+  active.forEach(t=>{
+    const wrap=document.createElement("div");
+    wrap.className="task-wrap";
+    wrap.innerHTML='<div class="delete-bg">削除</div>';
+    const card=document.createElement("button");
+    card.className=`task-card ${isRed(t)?"red":"green"}`;
+    const recurringLabel=t.kind==="recurring"
+      ? `<span class="badge">${t.repeatType==="weekly"?"週例":"月例"}</span>`:"";
+    const meta=t.kind==="recurring"
+      ? `出現日：${t.appearedAt}`
+      : `期限：${t.due||"未設定"}`;
+    card.innerHTML=`
+      <div class="task-title">${escapeHtml(t.title)}${recurringLabel}</div>
+      <div class="task-meta">${meta}</div>
+      <div class="detail">
+        <div><strong>補足：</strong>${escapeHtml(t.note||"なし")}</div>
+        <div class="actions">
+          <button class="small-btn complete" type="button">完了</button>
+          <button class="small-btn edit" type="button">編集</button>
+        </div>
+      </div>`;
+    wrap.appendChild(card);
+    list.appendChild(wrap);
+
+    let sx=0, moved=false;
+    card.addEventListener("touchstart",e=>{sx=e.touches[0].clientX;moved=false},{passive:true});
+    card.addEventListener("touchmove",e=>{
+      const dx=e.touches[0].clientX-sx;
+      if(dx<0){card.style.transform=`translateX(${Math.max(dx,-96)}px)`;moved=true}
+    },{passive:true});
+    card.addEventListener("touchend",()=>{
+      card.style.transform=moved?"translateX(-96px)":"translateX(0)";
+    });
+    card.addEventListener("click",e=>{
+      if(e.target.closest(".small-btn"))return;
+      card.classList.toggle("open");
+    });
+    wrap.querySelector(".delete-bg").onclick=()=>{
+      if(confirm("このタスクを削除しますか？")){
+        tasks=tasks.filter(x=>x.id!==t.id);save();renderTasks();
+      }
+    };
+    card.querySelector(".complete").onclick=e=>{
+      e.stopPropagation();
+      t.completed=true;save();renderTasks();
+    };
+    card.querySelector(".edit").onclick=e=>{
+      e.stopPropagation();
+      const title=prompt("タスク名",t.title);
+      if(title===null)return;
+      const note=prompt("補足説明",t.note||"");
+      t.title=title.trim()||t.title;
+      t.note=note===null?t.note:note;
+      if(t.kind!=="recurring"){
+        const due=prompt("期限（YYYY-MM-DD、空欄で未設定）",t.due||"");
+        if(due!==null)t.due=due.trim();
+      }
+      save();renderTasks();
+    };
+  });
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+
+$("addTaskBtn").onclick=()=>{
+  const title=$("titleInput").value.trim();
+  if(!title){alert("タスク名を入力してください");return}
+  tasks.push({
+    id:crypto.randomUUID(),
+    title,
+    due:$("dueInput").value,
+    note:$("noteInput").value.trim(),
+    completed:false,
+    kind:"normal",
+    createdAt:dateKey(new Date())
+  });
+  save();
+  $("titleInput").value="";
+  $("dueInput").value="";
+  $("noteInput").value="";
+  renderTasks();
+  showTab("tasks");
+};
+
+for(let i=1;i<=31;i++){
+  const o=document.createElement("option");
+  o.value=i;o.textContent=`${i}日`;
+  $("monthday").appendChild(o);
+}
+$("repeatType").onchange=()=>{
+  const weekly=$("repeatType").value==="weekly";
+  $("weeklyFields").style.display=weekly?"block":"none";
+  $("monthlyFields").style.display=weekly?"none":"block";
+};
+$("addRepeatBtn").onclick=()=>{
+  const title=$("repeatTitle").value.trim();
+  if(!title){alert("タスク名を入力してください");return}
+  const type=$("repeatType").value;
+  repeats.push({
+    id:crypto.randomUUID(),
+    title,
+    type,
+    weekday:$("weekday").value,
+    monthday:$("monthday").value,
+    note:$("repeatNote").value.trim()
+  });
+  save();
+  $("repeatTitle").value="";
+  $("repeatNote").value="";
+  renderRepeats();
+  renderTasks();
+};
+function renderRepeats(){
+  const box=$("repeatList");
+  if(!repeats.length){
+    box.innerHTML='<div class="empty">登録済みの週例・月例はありません</div>';
+    return;
+  }
+  const names=["日","月","火","水","木","金","土"];
+  box.innerHTML="";
+  repeats.forEach(r=>{
+    const div=document.createElement("div");
+    div.className="repeat-item";
+    const meta=r.type==="weekly"
+      ? `毎週${names[Number(r.weekday)]}曜日に出現`
+      : `毎月${r.monthday}日に出現`;
+    div.innerHTML=`
+      <div class="repeat-title">${escapeHtml(r.title)}</div>
+      <div class="repeat-meta">${meta}</div>
+      <div class="repeat-actions">
+        <button class="secondary">編集</button>
+        <button class="danger">削除</button>
+      </div>`;
+    div.querySelector(".danger").onclick=()=>{
+      if(confirm("この繰り返し設定を削除しますか？")){
+        repeats=repeats.filter(x=>x.id!==r.id);save();renderRepeats();
+      }
+    };
+    div.querySelector(".secondary").onclick=()=>{
+      const title=prompt("タスク名",r.title);
+      if(title===null)return;
+      const note=prompt("補足説明",r.note||"");
+      r.title=title.trim()||r.title;
+      r.note=note===null?r.note:note;
+      save();renderRepeats();renderTasks();
+    };
+    box.appendChild(div);
+  });
+}
+generateRecurring();
+renderTasks();
+renderRepeats();
 </script>
-</body></html>
+</body>
+</html>
