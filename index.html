@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>タスク管理</title>
+<style>
+body{font-family:sans-serif;background:#f4f4f4;margin:0;padding:12px}
+h2{margin:8px 0}
+#newTask{width:68%;padding:10px;font-size:16px}
+button{padding:10px 14px;font-size:16px}
+.card{background:#fff;border-radius:12px;padding:14px;margin:10px 0;box-shadow:0 2px 6px rgba(0,0,0,.15);position:relative;touch-action:pan-y}
+.title{font-size:20px;font-weight:bold}
+.detail{display:none;margin-top:8px;color:#444}
+.delete{display:none;position:absolute;right:10px;top:10px;background:#d33;color:#fff}
+</style></head>
+<body>
+<h2>タスク管理</h2>
+<input id="newTask" placeholder="タスク名">
+<button onclick="addTask()">追加</button>
+<div id="list"></div>
+<script>
+let tasks=JSON.parse(localStorage.getItem("tasks")||"[]");
+function save(){localStorage.setItem("tasks",JSON.stringify(tasks));}
+function render(){
+ const list=document.getElementById("list");list.innerHTML="";
+ tasks.forEach((t,i)=>{
+  const c=document.createElement("div");
+  c.className="card";
+  c.innerHTML='<div class="title">'+t.name+'</div>'
+   +'<button class="delete">削除</button>'
+   +'<div class="detail">期限: '+(t.due||"未設定")+'<br>補足: '+(t.note||"なし")+'</div>';
+  const d=c.querySelector(".detail");
+  c.querySelector(".title").onclick=()=>d.style.display=d.style.display=="block"?"none":"block";
+  let sx=0;
+  c.addEventListener("touchstart",e=>sx=e.touches[0].clientX);
+  c.addEventListener("touchend",e=>{
+    if(sx-e.changedTouches[0].clientX>60){
+      const b=c.querySelector(".delete");
+      b.style.display="block";
+      b.onclick=()=>{tasks.splice(i,1);save();render();}
+    }
+  });
+  list.appendChild(c);
+ });
+}
+function addTask(){
+ const n=document.getElementById("newTask").value.trim();
+ if(!n)return;
+ const due=prompt("期限 (任意)");
+ const note=prompt("補足説明 (任意)");
+ tasks.push({name:n,due:due||"",note:note||""});
+ save();render();
+ document.getElementById("newTask").value="";
+}
+render();
+</script>
+</body></html>
