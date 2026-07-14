@@ -41,6 +41,43 @@ textarea{min-height:95px;resize:vertical}
 .modal-backdrop.show{display:flex}.modal{width:100%;max-width:600px;background:#fff;border-radius:18px 18px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -5px 24px #0003}
 .modal h3{font-size:21px;margin:0 0 14px}.modal-actions{display:flex;gap:9px;margin-top:15px}
 .modal-actions button{flex:1;border:0;border-radius:10px;padding:13px;font-weight:900}.cancel{background:#e5e7eb}.save-btn{background:#111827;color:#fff}
+
+.date-field{cursor:pointer}
+.calendar-backdrop{
+  display:none;position:fixed;inset:0;z-index:80;background:#00000073;
+  align-items:center;justify-content:center;padding:18px
+}
+.calendar-backdrop.show{display:flex}
+.calendar-box{
+  width:100%;max-width:420px;background:#fff;border-radius:20px;
+  padding:18px;box-shadow:0 10px 35px #0004
+}
+.calendar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.calendar-title{font-size:20px;font-weight:900}
+.calendar-nav{
+  width:46px;height:46px;border:0;border-radius:12px;background:#f3f4f6;
+  font-size:28px;font-weight:700;line-height:1
+}
+.calendar-weekdays,.calendar-days{
+  display:grid;grid-template-columns:repeat(7,1fr);gap:5px
+}
+.calendar-weekdays div{
+  text-align:center;font-size:13px;font-weight:800;color:#6b7280;padding:5px 0
+}
+.calendar-day{
+  aspect-ratio:1;border:0;border-radius:50%;background:transparent;
+  font-size:17px;font-weight:700;color:#111827
+}
+.calendar-day.other{color:#c3c7ce}
+.calendar-day.today{outline:2px solid #93c5fd}
+.calendar-day.selected{background:#2563eb;color:#fff;outline:none}
+.calendar-footer{display:flex;gap:10px;margin-top:16px}
+.calendar-footer button{
+  flex:1;border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:900
+}
+.calendar-reset{background:#f3f4f6;color:#111827}
+.calendar-ok{background:#2563eb;color:#fff}
+
 </style>
 </head>
 <body>
@@ -56,7 +93,7 @@ textarea{min-height:95px;resize:vertical}
 <section id="add" class="panel"><div class="form">
 <h2>通常タスクを追加</h2>
 <label>タスク名</label><input id="titleInput" placeholder="例：水質検査結果の確認">
-<label>期限</label><input id="dueInput" type="date">
+<label>期限</label><input id="dueInput" class="date-field" type="text" readonly placeholder="期限を選択">
 <label>補足説明</label><textarea id="noteInput" placeholder="作業内容や注意点など"></textarea>
 <button class="primary" id="addTaskBtn">追加する</button>
 </div></section>
@@ -94,10 +131,29 @@ textarea{min-height:95px;resize:vertical}
 <div id="editModal" class="modal-backdrop"><div class="modal">
 <h3>タスクを編集</h3>
 <label>タスク名</label><input id="editTitle">
-<label>期限</label><input id="editDue" type="date">
+<label>期限</label><input id="editDue" class="date-field" type="text" readonly placeholder="期限を選択">
 <label>補足説明</label><textarea id="editNote"></textarea>
 <div class="modal-actions"><button id="cancelEdit" class="cancel">キャンセル</button><button id="saveEdit" class="save-btn">保存する</button></div>
 </div></div>
+
+
+<div id="calendarModal" class="calendar-backdrop">
+  <div class="calendar-box">
+    <div class="calendar-head">
+      <button id="calendarPrev" class="calendar-nav" type="button">‹</button>
+      <div id="calendarTitle" class="calendar-title"></div>
+      <button id="calendarNext" class="calendar-nav" type="button">›</button>
+    </div>
+    <div class="calendar-weekdays">
+      <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div>
+    </div>
+    <div id="calendarDays" class="calendar-days"></div>
+    <div class="calendar-footer">
+      <button id="calendarReset" class="calendar-reset" type="button">リセット</button>
+      <button id="calendarOk" class="calendar-ok" type="button">決定</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const TK="taskToolTasksV5",RK="taskToolRepeatsV5",DK="taskToolDismissedV5";
@@ -225,11 +281,49 @@ function renderTasks(){
   <div class="task-note">${esc(t.note||"なし")}</div><div class="actions">
   <button class="small-btn complete" type="button">完了</button><button class="small-btn edit" type="button">編集</button></div></div>`;
   w.appendChild(c);list.appendChild(w);
-  let sx=0,moved=false;
-  c.ontouchstart=e=>{sx=e.touches[0].clientX;moved=false};
-  c.ontouchmove=e=>{const dx=e.touches[0].clientX-sx;if(dx<0){c.style.transform=`translateX(${Math.max(dx,-96)}px)`;moved=true}};
-  c.ontouchend=()=>c.style.transform=moved?"translateX(-96px)":"translateX(0)";
-  c.onclick=e=>{if(!e.target.closest(".small-btn"))c.classList.toggle("open")};
+  let sx=0,sy=0,moved=false,swipeBlocked=false,swipeActive=false;
+  c.ontouchstart=e=>{
+   swipeBlocked=c.classList.contains("open");
+   sx=e.touches[0].clientX;
+   sy=e.touches[0].clientY;
+   moved=false;
+   swipeActive=false;
+   if(swipeBlocked)c.style.transform="translateX(0)";
+  };
+  c.ontouchmove=e=>{
+   if(swipeBlocked)return;
+   const dx=e.touches[0].clientX-sx;
+   const dy=e.touches[0].clientY-sy;
+
+   if(!swipeActive){
+    if(Math.abs(dy)>Math.abs(dx)){
+     return;
+    }
+    if(dx>-45){
+     return;
+    }
+    swipeActive=true;
+   }
+
+   if(dx<0){
+    const adjusted=Math.max(dx+45,-96);
+    c.style.transform=`translateX(${adjusted}px)`;
+    moved=true;
+    e.preventDefault();
+   }
+  };
+  c.ontouchend=e=>{
+   if(swipeBlocked){
+    c.style.transform="translateX(0)";
+    return;
+   }
+   const dx=e.changedTouches[0].clientX-sx;
+   const dy=e.changedTouches[0].clientY-sy;
+   const shouldOpen=swipeActive && Math.abs(dx)>75 && Math.abs(dx)>Math.abs(dy)*1.2;
+   c.style.transform=shouldOpen?"translateX(-96px)":"translateX(0)";
+   moved=shouldOpen;
+  };
+  c.onclick=e=>{if(!e.target.closest(".small-btn")){c.style.transform="translateX(0)";c.classList.toggle("open")}};
   w.querySelector(".delete-bg").onclick=()=>deleteTask(t);
   c.querySelector(".complete").onclick=e=>{e.stopPropagation();t.completed=true;save();renderTasks()};
   c.querySelector(".edit").onclick=e=>{e.stopPropagation();openEdit(t)};
@@ -255,7 +349,13 @@ const modeNames={first_business:"毎月1日を基準",second_monday:"第2月曜�
 function renderRepeats(){
  const box=$("repeatList");if(!repeats.length){box.innerHTML='<div class="empty">登録済みの週例・月例はありません</div>';return}
  box.innerHTML="";
- repeats.forEach(r=>{
+ const monthlyOrder={first_business:0,second_monday:1,third_monday:2,day15:3,last_business:4};
+ const sortedRepeats=[...repeats].sort((a,b)=>{
+  if(a.type!==b.type)return a.type==="weekly"?-1:1;
+  if(a.type==="weekly")return Number(a.weeklyDay||1)-Number(b.weeklyDay||1);
+  return (monthlyOrder[a.monthlyMode]??0)-(monthlyOrder[b.monthlyMode]??0);
+ });
+ sortedRepeats.forEach(r=>{
   const d=document.createElement("div");d.className="repeat-item";
   const rule=r.type==="weekly"?`週例・${dayNames[r.weeklyDay]||"月曜日"}`:`月例・${modeNames[r.monthlyMode]||modeNames.first_business}`;
   d.innerHTML=`<div class="repeat-title">${esc(r.title)}</div><div class="repeat-meta">${rule}</div>${r.note?`<div class="repeat-note">${esc(r.note)}</div>`:""}
@@ -268,6 +368,68 @@ function renderRepeats(){
   box.appendChild(d);
  });
 }
+
+let calendarTarget=null;
+let calendarView=new Date();
+let calendarSelected="";
+
+function openCalendar(input){
+ calendarTarget=input;
+ calendarSelected=input.value||"";
+ calendarView=calendarSelected?parse(calendarSelected):new Date();
+ calendarView=new Date(calendarView.getFullYear(),calendarView.getMonth(),1);
+ renderCalendar();
+ $("calendarModal").classList.add("show");
+}
+function closeCalendar(){
+ $("calendarModal").classList.remove("show");
+ calendarTarget=null;
+}
+function renderCalendar(){
+ const y=calendarView.getFullYear(),m=calendarView.getMonth();
+ $("calendarTitle").textContent=`${y}年${m+1}月`;
+ const box=$("calendarDays");
+ box.innerHTML="";
+ const first=new Date(y,m,1);
+ const mondayIndex=(first.getDay()+6)%7;
+ const start=add(first,-mondayIndex);
+ const today=dateKey(new Date());
+ for(let i=0;i<42;i++){
+  const d=add(start,i),key=dateKey(d);
+  const b=document.createElement("button");
+  b.type="button";
+  b.className="calendar-day";
+  b.textContent=d.getDate();
+  if(d.getMonth()!==m)b.classList.add("other");
+  if(key===today)b.classList.add("today");
+  if(key===calendarSelected)b.classList.add("selected");
+  b.onclick=()=>{calendarSelected=key;renderCalendar()};
+  box.appendChild(b);
+ }
+}
+document.querySelectorAll(".date-field").forEach(input=>{
+ input.addEventListener("click",()=>openCalendar(input));
+});
+$("calendarPrev").onclick=()=>{
+ calendarView=new Date(calendarView.getFullYear(),calendarView.getMonth()-1,1);
+ renderCalendar();
+};
+$("calendarNext").onclick=()=>{
+ calendarView=new Date(calendarView.getFullYear(),calendarView.getMonth()+1,1);
+ renderCalendar();
+};
+$("calendarReset").onclick=()=>{
+ if(calendarTarget)calendarTarget.value="";
+ closeCalendar();
+};
+$("calendarOk").onclick=()=>{
+ if(calendarTarget)calendarTarget.value=calendarSelected;
+ closeCalendar();
+};
+$("calendarModal").addEventListener("click",e=>{
+ if(e.target===$("calendarModal"))closeCalendar();
+});
+
 save();generate();renderTasks();renderRepeats();
 </script>
 </body>
