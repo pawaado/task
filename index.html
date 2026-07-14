@@ -6,104 +6,105 @@
 <title>タスク管理</title>
 <style>
 :root{
-  --green:#2f9e44;
-  --green-dark:#237a34;
-  --red:#d64545;
-  --red-dark:#a92f2f;
-  --bg:#eef3ef;
-  --card:#ffffff;
-  --text:#1f2937;
-  --muted:#6b7280;
+  --green:#2f9e44; --green-dark:#237a34;
+  --red:#d64545; --red-dark:#a92f2f;
+  --bg:#eef3ef; --text:#172033; --muted:#6b7280;
 }
 *{box-sizing:border-box}
 body{
-  margin:0;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  background:var(--bg);
-  color:var(--text);
+  margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:var(--bg);color:var(--text)
 }
 header{
-  position:sticky;top:0;z-index:10;
-  background:#fff;
-  padding:14px 14px 10px;
-  box-shadow:0 2px 10px rgba(0,0,0,.08);
+  position:sticky;top:0;z-index:10;background:#fff;
+  padding:14px 14px 10px;box-shadow:0 2px 10px rgba(0,0,0,.08)
 }
 h1{font-size:22px;margin:0 0 10px}
 .tabs{display:flex;gap:8px}
 .tab{
   flex:1;border:none;border-radius:10px;padding:11px 8px;
-  font-weight:700;background:#e5e7eb;color:#374151;
+  font-size:15px;font-weight:800;background:#e5e7eb;color:#374151
 }
 .tab.active{background:#111827;color:#fff}
 main{padding:14px 14px 90px}
-.panel{display:none}
-.panel.active{display:block}
+.panel{display:none}.panel.active{display:block}
 .form{
   background:#fff;border-radius:14px;padding:14px;
   box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:14px
 }
-label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}
-input,textarea,select{
-  width:100%;padding:11px;border:1px solid #cfd5dc;border-radius:10px;
+h2{font-size:23px;margin:4px 0 18px}
+label{display:block;font-size:14px;font-weight:800;margin:11px 0 6px}
+input,select,textarea{
+  width:100%;padding:12px;border:1px solid #cfd5dc;border-radius:10px;
   font-size:16px;background:#fff
 }
-textarea{min-height:76px;resize:vertical}
-.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+textarea{min-height:95px;resize:vertical}
 .primary{
-  width:100%;margin-top:12px;border:none;border-radius:11px;
-  padding:13px;font-size:16px;font-weight:800;background:#111827;color:#fff
+  width:100%;margin-top:14px;border:none;border-radius:11px;padding:14px;
+  font-size:17px;font-weight:900;background:#111827;color:#fff
 }
 .task-list{display:flex;flex-direction:column;gap:10px}
 .task-wrap{position:relative;overflow:hidden;border-radius:14px}
 .delete-bg{
-  position:absolute;inset:0 0 0 auto;width:96px;
-  display:flex;align-items:center;justify-content:center;
-  background:#991b1b;color:#fff;font-weight:800
+  position:absolute;inset:0 0 0 auto;width:96px;display:flex;
+  align-items:center;justify-content:center;background:#991b1b;
+  color:#fff;font-weight:900
 }
 .task-card{
-  position:relative;z-index:2;
-  border:none;width:100%;text-align:left;color:#fff;
-  padding:17px 16px;border-radius:14px;
-  transition:transform .18s ease;
+  position:relative;z-index:2;width:100%;border:none;text-align:left;color:#fff;
+  padding:17px 16px;border-radius:14px;transition:transform .18s ease;
   box-shadow:0 3px 10px rgba(0,0,0,.12)
 }
 .task-card.green{background:linear-gradient(135deg,var(--green),var(--green-dark))}
 .task-card.red{background:linear-gradient(135deg,var(--red),var(--red-dark))}
-.task-title{font-size:20px;font-weight:800;line-height:1.35}
-.task-meta{font-size:13px;opacity:.95;margin-top:6px}
+.task-title{font-size:20px;font-weight:900;line-height:1.35}
+.task-meta{font-size:13px;opacity:.96;margin-top:6px}
 .detail{
   display:none;margin-top:12px;padding-top:12px;
-  border-top:1px solid rgba(255,255,255,.35);font-size:15px;line-height:1.7
+  border-top:1px solid rgba(255,255,255,.35);font-size:15px;line-height:1.65
 }
 .task-card.open .detail{display:block}
+.task-note{white-space:pre-wrap;word-break:break-word}
 .actions{display:flex;gap:8px;margin-top:10px}
 .small-btn{
-  flex:1;border:none;border-radius:9px;padding:9px;font-weight:800
+  flex:1;border:none;border-radius:9px;padding:10px;font-weight:900;font-size:15px
 }
 .complete{background:#fff;color:#111827}
 .edit{background:rgba(255,255,255,.22);color:#fff}
-.empty{
-  background:#fff;border-radius:14px;padding:24px;text-align:center;color:var(--muted)
+.badge{
+  display:inline-block;margin-left:7px;padding:2px 7px;border-radius:999px;
+  font-size:11px;font-weight:900;background:rgba(255,255,255,.25)
 }
-.notice{
-  font-size:13px;color:var(--muted);line-height:1.6;margin:8px 2px 14px
+.empty{
+  background:#fff;border-radius:14px;padding:25px;text-align:center;color:var(--muted)
 }
 .repeat-item{
-  background:#fff;border-radius:12px;padding:13px;margin-bottom:10px;
+  background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;
   box-shadow:0 2px 8px rgba(0,0,0,.07)
 }
-.repeat-title{font-weight:800}
-.repeat-meta{font-size:13px;color:var(--muted);margin-top:4px}
-.repeat-actions{display:flex;gap:8px;margin-top:10px}
-.repeat-actions button{
-  flex:1;border:none;border-radius:8px;padding:9px;font-weight:700
-}
-.danger{background:#fee2e2;color:#991b1b}
+.repeat-title{font-weight:900;font-size:17px}
+.repeat-meta{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.6}
+.repeat-note{font-size:14px;margin-top:8px;white-space:pre-wrap;word-break:break-word}
+.repeat-actions{display:flex;gap:8px;margin-top:11px}
+.repeat-actions button{flex:1;border:none;border-radius:8px;padding:10px;font-weight:800}
 .secondary{background:#e5e7eb;color:#111827}
-.badge{
-  display:inline-block;margin-left:6px;padding:2px 7px;border-radius:999px;
-  font-size:11px;font-weight:800;background:rgba(255,255,255,.25)
+.danger{background:#fee2e2;color:#991b1b}
+
+.modal-backdrop{
+  display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);
+  align-items:flex-end;justify-content:center
 }
+.modal-backdrop.show{display:flex}
+.modal{
+  width:100%;max-width:600px;background:#fff;border-radius:18px 18px 0 0;
+  padding:20px 16px calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 -5px 24px rgba(0,0,0,.2)
+}
+.modal h3{font-size:21px;margin:0 0 14px}
+.modal-actions{display:flex;gap:9px;margin-top:15px}
+.modal-actions button{flex:1;border:none;border-radius:10px;padding:13px;font-weight:900}
+.cancel{background:#e5e7eb;color:#111827}
+.save-btn{background:#111827;color:#fff}
 </style>
 </head>
 <body>
@@ -118,9 +119,6 @@ textarea{min-height:76px;resize:vertical}
 
 <main>
 <section id="tasks" class="panel active">
-  <div class="notice">
-    通常タスクは期限の14日前から赤色になります。週例・月例は、その回のタスクが出現してから3日経過すると赤色になります。赤色のタスクは上に表示されます。
-  </div>
   <div id="taskList" class="task-list"></div>
 </section>
 
@@ -131,6 +129,8 @@ textarea{min-height:76px;resize:vertical}
     <input id="titleInput" placeholder="例：水質検査結果の確認">
     <label>期限</label>
     <input id="dueInput" type="date">
+    <label>補足説明</label>
+    <textarea id="noteInput" placeholder="作業内容や注意点など"></textarea>
     <button class="primary" id="addTaskBtn">追加する</button>
   </div>
 </section>
@@ -139,29 +139,73 @@ textarea{min-height:76px;resize:vertical}
   <div class="form">
     <h2>週例・月例を登録</h2>
     <label>タスク名</label>
-    <input id="repeatTitle" placeholder="例：週報作成">
+    <input id="repeatTitle" placeholder="例：スクリーン清掃">
     <label>種類</label>
     <select id="repeatType">
       <option value="weekly">週例</option>
       <option value="monthly">月例</option>
     </select>
-
+    <label>補足説明</label>
+    <textarea id="repeatNote" placeholder="作業内容や注意点など"></textarea>
     <button class="primary" id="addRepeatBtn">登録する</button>
-  </div>
-
-  <div class="notice">
-    週例は原則毎週月曜日、月例は原則毎月1日に出現します。土日・日本の祝日・12月29日～1月3日に当たる場合は、次の営業日に自動で繰り越します。
   </div>
   <div id="repeatList"></div>
 </section>
 </main>
 
-<script>
-const TASKS_KEY="taskToolTasksV2";
-const REPEATS_KEY="taskToolRepeatsV2";
+<div id="editModal" class="modal-backdrop">
+  <div class="modal">
+    <h3>タスクを編集</h3>
+    <label>タスク名</label>
+    <input id="editTitle">
+    <label>期限</label>
+    <input id="editDue" type="date">
+    <label>補足説明</label>
+    <textarea id="editNote"></textarea>
+    <div class="modal-actions">
+      <button id="cancelEdit" class="cancel">キャンセル</button>
+      <button id="saveEdit" class="save-btn">保存する</button>
+    </div>
+  </div>
+</div>
 
-let tasks=JSON.parse(localStorage.getItem(TASKS_KEY)||"[]").map(t=>{delete t.note;return t;});
-let repeats=JSON.parse(localStorage.getItem(REPEATS_KEY)||"[]").map(r=>({id:r.id||crypto.randomUUID(),title:r.title||"",type:r.type==="monthly"?"monthly":"weekly"}));
+<script>
+const TASKS_KEY="taskToolTasksV4";
+const REPEATS_KEY="taskToolRepeatsV4";
+const PREV_TASKS_KEY="taskToolTasksV3";
+const PREV_REPEATS_KEY="taskToolRepeatsV3";
+const OLD_TASKS_KEY="taskToolTasksV2";
+const OLD_REPEATS_KEY="taskToolRepeatsV2";
+
+function loadFirst(keys){
+  for(const key of keys){
+    const raw=localStorage.getItem(key);
+    if(raw!==null){
+      try{return JSON.parse(raw)}catch(e){}
+    }
+  }
+  return [];
+}
+if(localStorage.getItem(TASKS_KEY)===null){
+  localStorage.setItem(TASKS_KEY,JSON.stringify(loadFirst([PREV_TASKS_KEY,OLD_TASKS_KEY])));
+}
+if(localStorage.getItem(REPEATS_KEY)===null){
+  localStorage.setItem(REPEATS_KEY,JSON.stringify(loadFirst([PREV_REPEATS_KEY,OLD_REPEATS_KEY])));
+}
+
+let tasks=JSON.parse(localStorage.getItem(TASKS_KEY)||"[]").map(t=>({
+  ...t,
+  title:t.title||t.name||"",
+  due:t.due||"",
+  note:t.note||""
+}));
+let repeats=JSON.parse(localStorage.getItem(REPEATS_KEY)||"[]").map(r=>({
+  id:r.id||crypto.randomUUID(),
+  title:r.title||"",
+  type:r.type==="monthly"?"monthly":"weekly",
+  note:r.note||""
+}));
+let editingTaskId=null;
 
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,"0");
@@ -170,12 +214,10 @@ const parseLocal=s=>{
   const [y,m,d]=s.split("-").map(Number);
   return new Date(y,m-1,d);
 };
-const daysBetween=(a,b)=>{
-  const ms=24*60*60*1000;
-  const aa=new Date(a.getFullYear(),a.getMonth(),a.getDate());
-  const bb=new Date(b.getFullYear(),b.getMonth(),b.getDate());
-  return Math.floor((aa-bb)/ms);
-};
+const cloneDate=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+const addDays=(d,n)=>{const x=cloneDate(d);x.setDate(x.getDate()+n);return x};
+const daysBetween=(a,b)=>Math.floor((cloneDate(a)-cloneDate(b))/86400000);
+
 function save(){
   localStorage.setItem(TASKS_KEY,JSON.stringify(tasks));
   localStorage.setItem(REPEATS_KEY,JSON.stringify(repeats));
@@ -186,63 +228,91 @@ function showTab(name){
 }
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
-
-function cloneDate(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
-function addDays(d,n){const x=cloneDate(d);x.setDate(x.getDate()+n);return x;}
 function nthWeekdayOfMonth(year,month,weekday,n){
   const first=new Date(year,month,1);
   const offset=(weekday-first.getDay()+7)%7;
   return new Date(year,month,1+offset+(n-1)*7);
 }
-function vernalEquinoxDay(year){return Math.floor(20.8431+0.242194*(year-1980)-Math.floor((year-1980)/4));}
-function autumnEquinoxDay(year){return Math.floor(23.2488+0.242194*(year-1980)-Math.floor((year-1980)/4));}
-const holidayCache={};
-function japaneseHolidaySet(year){
-  if(holidayCache[year])return holidayCache[year];
+function vernalEquinoxDay(year){
+  return Math.floor(20.8431+0.242194*(year-1980)-Math.floor((year-1980)/4));
+}
+function autumnEquinoxDay(year){
+  return Math.floor(23.2488+0.242194*(year-1980)-Math.floor((year-1980)/4));
+}
+function baseJapaneseHolidays(year){
   const set=new Set();
   const add=(m,d)=>set.add(`${year}-${pad(m)}-${pad(d)}`);
-  add(1,1); set.add(dateKey(nthWeekdayOfMonth(year,0,1,2)));
-  add(2,11); if(year>=2020)add(2,23);
-  add(3,vernalEquinoxDay(year)); add(4,29); add(5,3); add(5,4); add(5,5);
+  add(1,1);
+  set.add(dateKey(nthWeekdayOfMonth(year,0,1,2)));
+  add(2,11);
+  if(year>=2020)add(2,23);
+  add(3,vernalEquinoxDay(year));
+  add(4,29);
+  add(5,3);add(5,4);add(5,5);
   set.add(dateKey(nthWeekdayOfMonth(year,6,1,3)));
   if(year>=2016)add(8,11);
   set.add(dateKey(nthWeekdayOfMonth(year,8,1,3)));
   add(9,autumnEquinoxDay(year));
   set.add(dateKey(nthWeekdayOfMonth(year,9,1,2)));
-  add(11,3); add(11,23); if(year<=2018)add(12,23);
-  if(year===2020){set.delete(`${year}-07-20`);set.delete(`${year}-10-12`);add(7,23);add(7,24);add(8,10);}
-  if(year===2021){set.delete(`${year}-07-19`);set.delete(`${year}-10-11`);add(7,22);add(7,23);add(8,8);}
+  add(11,3);add(11,23);
+  if(year<=2018)add(12,23);
+  if(year===2020){add(7,23);add(7,24);add(8,10)}
+  if(year===2021){add(7,22);add(7,23);add(8,8)}
+  return set;
+}
+const holidayCache={};
+function japaneseHolidaySet(year){
+  if(holidayCache[year])return holidayCache[year];
+  const set=baseJapaneseHolidays(year);
   [...set].sort().forEach(key=>{
     const d=parseLocal(key);
-    if(d.getDay()===0){let x=addDays(d,1);while(set.has(dateKey(x)))x=addDays(x,1);set.add(dateKey(x));}
+    if(d.getDay()===0){
+      let x=addDays(d,1);
+      while(set.has(dateKey(x)))x=addDays(x,1);
+      set.add(dateKey(x));
+    }
   });
-  let d=new Date(year,0,2), end=new Date(year,11,30);
+  let d=new Date(year,0,2);
+  const end=new Date(year,11,30);
   while(d<=end){
     const key=dateKey(d);
-    if(!set.has(key)&&set.has(dateKey(addDays(d,-1)))&&set.has(dateKey(addDays(d,1))))set.add(key);
+    if(!set.has(key)){
+      const prev=dateKey(addDays(d,-1));
+      const next=dateKey(addDays(d,1));
+      if(set.has(prev)&&set.has(next))set.add(key);
+    }
     d=addDays(d,1);
   }
-  holidayCache[year]=set;return set;
+  holidayCache[year]=set;
+  return set;
 }
 function isYearEndHoliday(d){
-  const m=d.getMonth()+1, day=d.getDate();
+  const m=d.getMonth()+1,day=d.getDate();
   return (m===12&&day>=29)||(m===1&&day<=3);
 }
 function isBusinessDay(d){
-  return d.getDay()!==0&&d.getDay()!==6&&!isYearEndHoliday(d)&&!japaneseHolidaySet(d.getFullYear()).has(dateKey(d));
+  const dow=d.getDay();
+  if(dow===0||dow===6)return false;
+  if(isYearEndHoliday(d))return false;
+  return !japaneseHolidaySet(d.getFullYear()).has(dateKey(d));
 }
-function nextBusinessDayOnOrAfter(d){let x=cloneDate(d);while(!isBusinessDay(x))x=addDays(x,1);return x;}
-function getWeekStart(d){
-  const x=cloneDate(d);const diff=x.getDay()===0?-6:1-x.getDay();return addDays(x,diff);
+function nextBusinessDayOnOrAfter(d){
+  let x=cloneDate(d);
+  while(!isBusinessDay(x))x=addDays(x,1);
+  return x;
 }
-
+function getWeekMonday(d){
+  const x=cloneDate(d);
+  const diff=x.getDay()===0?-6:1-x.getDay();
+  return addDays(x,diff);
+}
 function generateRecurring(){
   const today=cloneDate(new Date());
   let changed=false;
   repeats.forEach(r=>{
-    let target, periodKey;
+    let target,periodKey;
     if(r.type==="weekly"){
-      const monday=getWeekStart(today);
+      const monday=getWeekMonday(today);
       target=nextBusinessDayOnOrAfter(monday);
       periodKey=`W-${dateKey(monday)}`;
     }else{
@@ -253,8 +323,15 @@ function generateRecurring(){
       const occurrenceKey=`${r.id}-${periodKey}`;
       if(!tasks.some(t=>t.occurrenceKey===occurrenceKey)){
         tasks.push({
-          id:crypto.randomUUID(), title:r.title, due:dateKey(target), completed:false,
-          kind:"recurring", repeatType:r.type, appearedAt:dateKey(target), occurrenceKey
+          id:crypto.randomUUID(),
+          title:r.title,
+          due:dateKey(target),
+          note:r.note||"",
+          completed:false,
+          kind:"recurring",
+          repeatType:r.type,
+          appearedAt:dateKey(target),
+          occurrenceKey
         });
         changed=true;
       }
@@ -263,25 +340,55 @@ function generateRecurring(){
   if(changed)save();
 }
 function isRed(t){
-  const today=new Date();
+  const today=cloneDate(new Date());
   if(t.kind==="recurring"){
     return daysBetween(today,parseLocal(t.appearedAt))>=3;
   }
   if(!t.due)return false;
   return daysBetween(parseLocal(t.due),today)<=14;
 }
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,m=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[m]));
+}
+function openEdit(t){
+  editingTaskId=t.id;
+  $("editTitle").value=t.title;
+  $("editDue").value=t.due||"";
+  $("editNote").value=t.note||"";
+  $("editModal").classList.add("show");
+}
+function closeEdit(){
+  editingTaskId=null;
+  $("editModal").classList.remove("show");
+}
+$("cancelEdit").onclick=closeEdit;
+$("editModal").addEventListener("click",e=>{
+  if(e.target===$("editModal"))closeEdit();
+});
+$("saveEdit").onclick=()=>{
+  const t=tasks.find(x=>x.id===editingTaskId);
+  if(!t)return closeEdit();
+  const title=$("editTitle").value.trim();
+  if(!title){alert("タスク名を入力してください");return}
+  t.title=title;
+  t.due=$("editDue").value;
+  t.note=$("editNote").value.trim();
+  save();closeEdit();renderTasks();
+};
+
 function renderTasks(){
   generateRecurring();
   const list=$("taskList");
   const active=tasks.filter(t=>!t.completed);
   active.sort((a,b)=>{
-    const ar=isRed(a)?1:0, br=isRed(b)?1:0;
+    const ar=isRed(a)?1:0,br=isRed(b)?1:0;
     if(ar!==br)return br-ar;
     const ad=a.due?parseLocal(a.due).getTime():Infinity;
     const bd=b.due?parseLocal(b.due).getTime():Infinity;
     return ad-bd;
   });
-
   if(!active.length){
     list.innerHTML='<div class="empty">未完了のタスクはありません</div>';
     return;
@@ -293,15 +400,17 @@ function renderTasks(){
     wrap.innerHTML='<div class="delete-bg">削除</div>';
     const card=document.createElement("button");
     card.className=`task-card ${isRed(t)?"red":"green"}`;
-    const recurringLabel=t.kind==="recurring"
+    const label=t.kind==="recurring"
       ? `<span class="badge">${t.repeatType==="weekly"?"週例":"月例"}</span>`:"";
-    const meta=`期限：${t.due||"未設定"}`;
+    const appearance=t.kind==="recurring"
+      ? `<div>出現日：${t.appearedAt}</div>`:"";
     card.innerHTML=`
-      <div class="task-title">${escapeHtml(t.title)}${recurringLabel}</div>
-      <div class="task-meta">${meta}</div>
+      <div class="task-title">${escapeHtml(t.title)}${label}</div>
+      <div class="task-meta">期限：${t.due||"未設定"}</div>
       <div class="detail">
-        ${t.kind==="recurring"?`<div>出現日：${t.appearedAt}</div>`:""}
-        <div>期限：${t.due||"未設定"}</div>
+        ${appearance}
+        <div><strong>補足：</strong></div>
+        <div class="task-note">${escapeHtml(t.note||"なし")}</div>
         <div class="actions">
           <button class="small-btn complete" type="button">完了</button>
           <button class="small-btn edit" type="button">編集</button>
@@ -310,7 +419,7 @@ function renderTasks(){
     wrap.appendChild(card);
     list.appendChild(wrap);
 
-    let sx=0, moved=false;
+    let sx=0,moved=false;
     card.addEventListener("touchstart",e=>{sx=e.touches[0].clientX;moved=false},{passive:true});
     card.addEventListener("touchmove",e=>{
       const dx=e.touches[0].clientX-sx;
@@ -329,22 +438,12 @@ function renderTasks(){
       }
     };
     card.querySelector(".complete").onclick=e=>{
-      e.stopPropagation();
-      t.completed=true;save();renderTasks();
+      e.stopPropagation();t.completed=true;save();renderTasks();
     };
     card.querySelector(".edit").onclick=e=>{
-      e.stopPropagation();
-      const title=prompt("タスク名",t.title);
-      if(title===null)return;
-      const due=prompt("期限（YYYY-MM-DD、空欄で未設定）",t.due||"");
-      t.title=title.trim()||t.title;
-      if(due!==null)t.due=due.trim();
-      save();renderTasks();
+      e.stopPropagation();openEdit(t);
     };
   });
-}
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 
 $("addTaskBtn").onclick=()=>{
@@ -354,6 +453,7 @@ $("addTaskBtn").onclick=()=>{
     id:crypto.randomUUID(),
     title,
     due:$("dueInput").value,
+    note:$("noteInput").value.trim(),
     completed:false,
     kind:"normal",
     createdAt:dateKey(new Date())
@@ -361,6 +461,7 @@ $("addTaskBtn").onclick=()=>{
   save();
   $("titleInput").value="";
   $("dueInput").value="";
+  $("noteInput").value="";
   renderTasks();
   showTab("tasks");
 };
@@ -368,13 +469,19 @@ $("addTaskBtn").onclick=()=>{
 $("addRepeatBtn").onclick=()=>{
   const title=$("repeatTitle").value.trim();
   if(!title){alert("タスク名を入力してください");return}
-  const type=$("repeatType").value;
-  repeats.push({id:crypto.randomUUID(),title,type});
+  repeats.push({
+    id:crypto.randomUUID(),
+    title,
+    type:$("repeatType").value,
+    note:$("repeatNote").value.trim()
+  });
   save();
   $("repeatTitle").value="";
+  $("repeatNote").value="";
   renderRepeats();
   renderTasks();
 };
+
 function renderRepeats(){
   const box=$("repeatList");
   if(!repeats.length){
@@ -385,30 +492,35 @@ function renderRepeats(){
   repeats.forEach(r=>{
     const div=document.createElement("div");
     div.className="repeat-item";
-    const meta=r.type==="weekly"
-      ? "原則毎週月曜日（休業日は次の営業日）"
-      : "原則毎月1日（休業日は次の営業日）";
+    const meta=r.type==="weekly"?"週例":"月例";
+    const note=r.note?`<div class="repeat-note">${escapeHtml(r.note)}</div>`:"";
     div.innerHTML=`
       <div class="repeat-title">${escapeHtml(r.title)}</div>
       <div class="repeat-meta">${meta}</div>
+      ${note}
       <div class="repeat-actions">
         <button class="secondary">編集</button>
         <button class="danger">削除</button>
       </div>`;
+    div.querySelector(".secondary").onclick=()=>{
+      const title=prompt("タスク名",r.title);
+      if(title===null)return;
+      if(!title.trim()){alert("タスク名を入力してください");return}
+      const note=prompt("補足説明",r.note||"");
+      r.title=title.trim();
+      if(note!==null)r.note=note.trim();
+      save();renderRepeats();
+    };
     div.querySelector(".danger").onclick=()=>{
       if(confirm("この繰り返し設定を削除しますか？")){
         repeats=repeats.filter(x=>x.id!==r.id);save();renderRepeats();
       }
     };
-    div.querySelector(".secondary").onclick=()=>{
-      const title=prompt("タスク名",r.title);
-      if(title===null)return;
-      r.title=title.trim()||r.title;
-      save();renderRepeats();renderTasks();
-    };
     box.appendChild(div);
   });
 }
+
+save();
 generateRecurring();
 renderTasks();
 renderRepeats();
