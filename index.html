@@ -131,8 +131,6 @@ textarea{min-height:76px;resize:vertical}
     <input id="titleInput" placeholder="例：水質検査結果の確認">
     <label>期限</label>
     <input id="dueInput" type="date">
-    <label>補足説明</label>
-    <textarea id="noteInput" placeholder="必要な手順や注意点など"></textarea>
     <button class="primary" id="addTaskBtn">追加する</button>
   </div>
 </section>
@@ -148,29 +146,12 @@ textarea{min-height:76px;resize:vertical}
       <option value="monthly">月例</option>
     </select>
 
-    <div id="weeklyFields">
-      <label>出現する曜日</label>
-      <select id="weekday">
-        <option value="1">月曜日</option>
-        <option value="2">火曜日</option>
-        <option value="3">水曜日</option>
-        <option value="4">木曜日</option>
-        <option value="5">金曜日</option>
-        <option value="6">土曜日</option>
-        <option value="0">日曜日</option>
-      </select>
-    </div>
-
-    <div id="monthlyFields" style="display:none">
-      <label>出現する日</label>
-      <select id="monthday"></select>
-    </div>
-
-    <label>補足説明</label>
-    <textarea id="repeatNote" placeholder="任意"></textarea>
     <button class="primary" id="addRepeatBtn">登録する</button>
   </div>
 
+  <div class="notice">
+    週例は原則毎週月曜日、月例は原則毎月1日に出現します。土日・日本の祝日・12月29日～1月3日に当たる場合は、次の営業日に自動で繰り越します。
+  </div>
   <div id="repeatList"></div>
 </section>
 </main>
@@ -179,8 +160,8 @@ textarea{min-height:76px;resize:vertical}
 const TASKS_KEY="taskToolTasksV2";
 const REPEATS_KEY="taskToolRepeatsV2";
 
-let tasks=JSON.parse(localStorage.getItem(TASKS_KEY)||"[]");
-let repeats=JSON.parse(localStorage.getItem(REPEATS_KEY)||"[]");
+let tasks=JSON.parse(localStorage.getItem(TASKS_KEY)||"[]").map(t=>{delete t.note;return t;});
+let repeats=JSON.parse(localStorage.getItem(REPEATS_KEY)||"[]").map(r=>({id:r.id||crypto.randomUUID(),title:r.title||"",type:r.type==="monthly"?"monthly":"weekly"}));
 
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,"0");
@@ -205,62 +186,77 @@ function showTab(name){
 }
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
-function getWeekStart(d){
-  const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
-  const day=x.getDay();
-  const diff=(day===0?-6:1-day);
-  x.setDate(x.getDate()+diff);
-  return x;
-}
-function generateRecurring(){
-  const today=new Date();
-  const todayKey=dateKey(today);
-  let changed=false;
 
+function cloneDate(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function addDays(d,n){const x=cloneDate(d);x.setDate(x.getDate()+n);return x;}
+function nthWeekdayOfMonth(year,month,weekday,n){
+  const first=new Date(year,month,1);
+  const offset=(weekday-first.getDay()+7)%7;
+  return new Date(year,month,1+offset+(n-1)*7);
+}
+function vernalEquinoxDay(year){return Math.floor(20.8431+0.242194*(year-1980)-Math.floor((year-1980)/4));}
+function autumnEquinoxDay(year){return Math.floor(23.2488+0.242194*(year-1980)-Math.floor((year-1980)/4));}
+const holidayCache={};
+function japaneseHolidaySet(year){
+  if(holidayCache[year])return holidayCache[year];
+  const set=new Set();
+  const add=(m,d)=>set.add(`${year}-${pad(m)}-${pad(d)}`);
+  add(1,1); set.add(dateKey(nthWeekdayOfMonth(year,0,1,2)));
+  add(2,11); if(year>=2020)add(2,23);
+  add(3,vernalEquinoxDay(year)); add(4,29); add(5,3); add(5,4); add(5,5);
+  set.add(dateKey(nthWeekdayOfMonth(year,6,1,3)));
+  if(year>=2016)add(8,11);
+  set.add(dateKey(nthWeekdayOfMonth(year,8,1,3)));
+  add(9,autumnEquinoxDay(year));
+  set.add(dateKey(nthWeekdayOfMonth(year,9,1,2)));
+  add(11,3); add(11,23); if(year<=2018)add(12,23);
+  if(year===2020){set.delete(`${year}-07-20`);set.delete(`${year}-10-12`);add(7,23);add(7,24);add(8,10);}
+  if(year===2021){set.delete(`${year}-07-19`);set.delete(`${year}-10-11`);add(7,22);add(7,23);add(8,8);}
+  [...set].sort().forEach(key=>{
+    const d=parseLocal(key);
+    if(d.getDay()===0){let x=addDays(d,1);while(set.has(dateKey(x)))x=addDays(x,1);set.add(dateKey(x));}
+  });
+  let d=new Date(year,0,2), end=new Date(year,11,30);
+  while(d<=end){
+    const key=dateKey(d);
+    if(!set.has(key)&&set.has(dateKey(addDays(d,-1)))&&set.has(dateKey(addDays(d,1))))set.add(key);
+    d=addDays(d,1);
+  }
+  holidayCache[year]=set;return set;
+}
+function isYearEndHoliday(d){
+  const m=d.getMonth()+1, day=d.getDate();
+  return (m===12&&day>=29)||(m===1&&day<=3);
+}
+function isBusinessDay(d){
+  return d.getDay()!==0&&d.getDay()!==6&&!isYearEndHoliday(d)&&!japaneseHolidaySet(d.getFullYear()).has(dateKey(d));
+}
+function nextBusinessDayOnOrAfter(d){let x=cloneDate(d);while(!isBusinessDay(x))x=addDays(x,1);return x;}
+function getWeekStart(d){
+  const x=cloneDate(d);const diff=x.getDay()===0?-6:1-x.getDay();return addDays(x,diff);
+}
+
+function generateRecurring(){
+  const today=cloneDate(new Date());
+  let changed=false;
   repeats.forEach(r=>{
+    let target, periodKey;
     if(r.type==="weekly"){
-      const weekStart=getWeekStart(today);
-      const target=new Date(weekStart);
-      const offset=(Number(r.weekday)+6)%7;
-      target.setDate(weekStart.getDate()+offset);
-      if(target<=today){
-        const occurrenceKey=`${r.id}-${dateKey(target)}`;
-        const exists=tasks.some(t=>t.occurrenceKey===occurrenceKey);
-        if(!exists){
-          tasks.push({
-            id:crypto.randomUUID(),
-            title:r.title,
-            due:"",
-            note:r.note||"",
-            completed:false,
-            kind:"recurring",
-            repeatType:"weekly",
-            appearedAt:dateKey(target),
-            occurrenceKey
-          });
-          changed=true;
-        }
-      }
+      const monday=getWeekStart(today);
+      target=nextBusinessDayOnOrAfter(monday);
+      periodKey=`W-${dateKey(monday)}`;
     }else{
-      const day=Math.min(Number(r.monthday),new Date(today.getFullYear(),today.getMonth()+1,0).getDate());
-      const target=new Date(today.getFullYear(),today.getMonth(),day);
-      if(target<=today){
-        const occurrenceKey=`${r.id}-${dateKey(target)}`;
-        const exists=tasks.some(t=>t.occurrenceKey===occurrenceKey);
-        if(!exists){
-          tasks.push({
-            id:crypto.randomUUID(),
-            title:r.title,
-            due:"",
-            note:r.note||"",
-            completed:false,
-            kind:"recurring",
-            repeatType:"monthly",
-            appearedAt:dateKey(target),
-            occurrenceKey
-          });
-          changed=true;
-        }
+      target=nextBusinessDayOnOrAfter(new Date(today.getFullYear(),today.getMonth(),1));
+      periodKey=`M-${today.getFullYear()}-${pad(today.getMonth()+1)}`;
+    }
+    if(target<=today){
+      const occurrenceKey=`${r.id}-${periodKey}`;
+      if(!tasks.some(t=>t.occurrenceKey===occurrenceKey)){
+        tasks.push({
+          id:crypto.randomUUID(), title:r.title, due:dateKey(target), completed:false,
+          kind:"recurring", repeatType:r.type, appearedAt:dateKey(target), occurrenceKey
+        });
+        changed=true;
       }
     }
   });
@@ -299,14 +295,13 @@ function renderTasks(){
     card.className=`task-card ${isRed(t)?"red":"green"}`;
     const recurringLabel=t.kind==="recurring"
       ? `<span class="badge">${t.repeatType==="weekly"?"週例":"月例"}</span>`:"";
-    const meta=t.kind==="recurring"
-      ? `出現日：${t.appearedAt}`
-      : `期限：${t.due||"未設定"}`;
+    const meta=`期限：${t.due||"未設定"}`;
     card.innerHTML=`
       <div class="task-title">${escapeHtml(t.title)}${recurringLabel}</div>
       <div class="task-meta">${meta}</div>
       <div class="detail">
-        <div><strong>補足：</strong>${escapeHtml(t.note||"なし")}</div>
+        ${t.kind==="recurring"?`<div>出現日：${t.appearedAt}</div>`:""}
+        <div>期限：${t.due||"未設定"}</div>
         <div class="actions">
           <button class="small-btn complete" type="button">完了</button>
           <button class="small-btn edit" type="button">編集</button>
@@ -341,13 +336,9 @@ function renderTasks(){
       e.stopPropagation();
       const title=prompt("タスク名",t.title);
       if(title===null)return;
-      const note=prompt("補足説明",t.note||"");
+      const due=prompt("期限（YYYY-MM-DD、空欄で未設定）",t.due||"");
       t.title=title.trim()||t.title;
-      t.note=note===null?t.note:note;
-      if(t.kind!=="recurring"){
-        const due=prompt("期限（YYYY-MM-DD、空欄で未設定）",t.due||"");
-        if(due!==null)t.due=due.trim();
-      }
+      if(due!==null)t.due=due.trim();
       save();renderTasks();
     };
   });
@@ -363,7 +354,6 @@ $("addTaskBtn").onclick=()=>{
     id:crypto.randomUUID(),
     title,
     due:$("dueInput").value,
-    note:$("noteInput").value.trim(),
     completed:false,
     kind:"normal",
     createdAt:dateKey(new Date())
@@ -371,36 +361,17 @@ $("addTaskBtn").onclick=()=>{
   save();
   $("titleInput").value="";
   $("dueInput").value="";
-  $("noteInput").value="";
   renderTasks();
   showTab("tasks");
 };
 
-for(let i=1;i<=31;i++){
-  const o=document.createElement("option");
-  o.value=i;o.textContent=`${i}日`;
-  $("monthday").appendChild(o);
-}
-$("repeatType").onchange=()=>{
-  const weekly=$("repeatType").value==="weekly";
-  $("weeklyFields").style.display=weekly?"block":"none";
-  $("monthlyFields").style.display=weekly?"none":"block";
-};
 $("addRepeatBtn").onclick=()=>{
   const title=$("repeatTitle").value.trim();
   if(!title){alert("タスク名を入力してください");return}
   const type=$("repeatType").value;
-  repeats.push({
-    id:crypto.randomUUID(),
-    title,
-    type,
-    weekday:$("weekday").value,
-    monthday:$("monthday").value,
-    note:$("repeatNote").value.trim()
-  });
+  repeats.push({id:crypto.randomUUID(),title,type});
   save();
   $("repeatTitle").value="";
-  $("repeatNote").value="";
   renderRepeats();
   renderTasks();
 };
@@ -410,14 +381,13 @@ function renderRepeats(){
     box.innerHTML='<div class="empty">登録済みの週例・月例はありません</div>';
     return;
   }
-  const names=["日","月","火","水","木","金","土"];
   box.innerHTML="";
   repeats.forEach(r=>{
     const div=document.createElement("div");
     div.className="repeat-item";
     const meta=r.type==="weekly"
-      ? `毎週${names[Number(r.weekday)]}曜日に出現`
-      : `毎月${r.monthday}日に出現`;
+      ? "原則毎週月曜日（休業日は次の営業日）"
+      : "原則毎月1日（休業日は次の営業日）";
     div.innerHTML=`
       <div class="repeat-title">${escapeHtml(r.title)}</div>
       <div class="repeat-meta">${meta}</div>
@@ -433,9 +403,7 @@ function renderRepeats(){
     div.querySelector(".secondary").onclick=()=>{
       const title=prompt("タスク名",r.title);
       if(title===null)return;
-      const note=prompt("補足説明",r.note||"");
       r.title=title.trim()||r.title;
-      r.note=note===null?r.note:note;
       save();renderRepeats();renderTasks();
     };
     box.appendChild(div);
