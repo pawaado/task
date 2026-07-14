@@ -276,7 +276,7 @@ function renderTasks(){
   const w=document.createElement("div");w.className="task-wrap";w.innerHTML='<div class="delete-bg">削除</div>';
   const c=document.createElement("button");c.className=`task-card ${red(t)?"red":"green"}`;
   const badge=t.kind==="recurring"?`<span class="badge">${t.repeatType==="weekly"?"週例":"月例"}</span>`:"";
-  c.innerHTML=`<div class="task-title">${esc(t.title)}${badge}</div><div class="task-meta">期限：${t.due||"未設定"}</div>
+  c.innerHTML=`<div class="task-title">${esc(t.title)}${badge}</div><div class="task-meta">期限：${t.due ? (t.due===dateKey(new Date()) ? "今日中" : t.due) : "未設定"}</div>
   <div class="detail">${t.kind==="recurring"?`<div>出現日：${t.appearedAt}</div>`:""}<div><strong>補足：</strong></div>
   <div class="task-note">${esc(t.note||"なし")}</div><div class="actions">
   <button class="small-btn complete" type="button">完了</button><button class="small-btn edit" type="button">編集</button></div></div>`;
