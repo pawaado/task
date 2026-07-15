@@ -188,25 +188,75 @@ textarea{min-height:95px;resize:vertical}
 </div>
 
 <script>
-const TK="taskToolTasksV5",RK="taskToolRepeatsV5",DK="taskToolDismissedV5";
-const priorTasks=["taskToolTasksV4","taskToolTasksV3","taskToolTasksV2"];
-const priorRepeats=["taskToolRepeatsV4","taskToolRepeatsV3","taskToolRepeatsV2"];
+const TK="taskToolTasksV14";
+const RK="taskToolRepeatsV14";
+const DK="taskToolDismissedV14";
 
-function firstStored(keys){
- for(const k of keys){const v=localStorage.getItem(k);if(v!==null){try{return JSON.parse(v)}catch(e){}}}
- return [];
+const taskKeys=[
+ TK,
+ "taskToolTasksV5",
+ "taskToolTasksV4",
+ "taskToolTasksV3",
+ "taskToolTasksV2",
+ "tasks"
+];
+const repeatKeys=[
+ RK,
+ "taskToolRepeatsV5",
+ "taskToolRepeatsV4",
+ "taskToolRepeatsV3",
+ "taskToolRepeatsV2",
+ "repeats"
+];
+const dismissedKeys=[
+ DK,
+ "taskToolDismissedV5"
+];
+
+function safeArrayFromKey(key){
+ const raw=localStorage.getItem(key);
+ if(raw===null)return [];
+ try{
+  const parsed=JSON.parse(raw);
+  return Array.isArray(parsed)?parsed:[];
+ }catch(e){
+  return [];
+ }
 }
-if(localStorage.getItem(TK)===null)localStorage.setItem(TK,JSON.stringify(firstStored(priorTasks)));
-if(localStorage.getItem(RK)===null)localStorage.setItem(RK,JSON.stringify(firstStored(priorRepeats)));
-if(localStorage.getItem(DK)===null)localStorage.setItem(DK,"[]");
+function bestStoredArray(keys){
+ let best=[];
+ for(const key of keys){
+  const value=safeArrayFromKey(key);
+  if(value.length>best.length)best=value;
+ }
+ return best;
+}
 
-let tasks=JSON.parse(localStorage.getItem(TK)||"[]").map(t=>({...t,title:t.title||t.name||"",due:t.due||"",note:t.note||""}));
-let repeats=JSON.parse(localStorage.getItem(RK)||"[]").map(r=>({
- id:r.id||crypto.randomUUID(),title:r.title||"",type:r.type==="monthly"?"monthly":"weekly",note:r.note||"",
+
+const recoveredFromOldKey =
+ localStorage.getItem("taskToolTasksV14")===null &&
+ taskKeys.slice(1).some(k=>safeArrayFromKey(k).length>0);
+
+let tasks=bestStoredArray(taskKeys).map(t=>({
+ ...t,
+ id:t.id||crypto.randomUUID(),
+ title:t.title||t.name||"",
+ due:t.due||"",
+ note:t.note||"",
+ completed:!!t.completed,
+ kind:t.kind||"normal"
+}));
+
+let repeats=bestStoredArray(repeatKeys).map(r=>({
+ id:r.id||crypto.randomUUID(),
+ title:r.title||"",
+ type:r.type==="monthly"?"monthly":"weekly",
+ note:r.note||"",
  weeklyDay:String(r.weeklyDay??r.weekday??1),
  monthlyMode:r.monthlyMode||"first_business"
 }));
-let dismissed=new Set(JSON.parse(localStorage.getItem(DK)||"[]"));
+
+let dismissed=new Set(bestStoredArray(dismissedKeys));
 let editingId=null;
 const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,"0");
 const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -216,7 +266,9 @@ const add=(d,n)=>{const x=clone(d);x.setDate(x.getDate()+n);return x};
 const diff=(a,b)=>Math.floor((clone(a)-clone(b))/86400000);
 
 const PHOTO_LIMIT=5,PHOTO_DB_NAME="taskToolPhotosV1",PHOTO_STORE="photos";
+const REPEAT_PHOTO_DB_NAME="taskToolRepeatPhotosV1",REPEAT_PHOTO_STORE="repeatPhotos";
 let addPendingPhotos=[],editExistingPhotos=[],editPendingPhotos=[],editRemovedPhotoIds=new Set();
+let repeatPendingPhotos=[];
 
 const repeatPhotoDbPromise=new Promise((resolve,reject)=>{
  const req=indexedDB.open(REPEAT_PHOTO_DB_NAME,1);
@@ -476,7 +528,14 @@ function renderTasks(){
 $("addTaskBtn").onclick=async()=>{
  const title=$("titleInput").value.trim();if(!title)return alert("タスク名を入力してください");
  const task={id:crypto.randomUUID(),title,due:$("dueInput").value,note:$("noteInput").value.trim(),completed:false,kind:"normal",createdAt:dateKey(new Date())};tasks.push(task);
- try{for(const data of addPendingPhotos)await storePhoto(task.id,data)}catch(e){alert("写真の保存に失敗しました。Safariの空き容量を確認してください。")}save();$("titleInput").value=$("dueInput").value=$("noteInput").value="";addPendingPhotos=[];renderAddPhotoPreview();renderTasks();showTab("tasks");
+ const taskPhotos=Array.isArray(addPendingPhotos)?[...addPendingPhotos]:[];
+ if(taskPhotos.length){
+  try{for(const data of taskPhotos)await storePhoto(task.id,data)}
+  catch(e){
+   console.error("通常タスク写真の保存エラー",e);
+   alert("写真の保存に失敗しました。写真なしでタスクを登録しました。");
+  }
+ }save();$("titleInput").value=$("dueInput").value=$("noteInput").value="";addPendingPhotos=[];renderAddPhotoPreview();renderTasks();showTab("tasks");
 };
 
 $("repeatType").onchange=()=>{
@@ -487,10 +546,14 @@ $("addRepeatBtn").onclick=async()=>{
  const title=$("repeatTitle").value.trim();if(!title)return alert("タスク名を入力してください");
  const repeat={id:crypto.randomUUID(),title,type:$("repeatType").value,note:$("repeatNote").value.trim(),weeklyDay:$("weeklyDay").value,monthlyMode:$("monthlyMode").value};
  repeats.push(repeat);
- try{
-  for(const data of repeatPendingPhotos)await storeRepeatPhoto(repeat.id,data);
- }catch(e){
-  alert("写真の保存に失敗しました。Safariの空き容量を確認してください。");
+ const photosToSave=Array.isArray(repeatPendingPhotos)?[...repeatPendingPhotos]:[];
+ if(photosToSave.length){
+  try{
+   for(const data of photosToSave)await storeRepeatPhoto(repeat.id,data);
+  }catch(e){
+   console.error("週例・月例写真の保存エラー",e);
+   alert("写真の保存に失敗しました。写真なしで週例・月例タスクを登録しました。");
+  }
  }
  save();
  $("repeatTitle").value=$("repeatNote").value="";
@@ -595,7 +658,17 @@ $("calendarModal").addEventListener("click",e=>{
 
 renderAddPhotoPreview();
 renderRepeatPhotoPreview();
-save();generate();renderTasks();renderRepeats();
+generate();
+renderTasks();
+renderRepeats();
+
+if(recoveredFromOldKey && tasks.length){
+ setTimeout(()=>alert(`保存されていたタスクを${tasks.length}件復旧しました。`),100);
+}
+// 復旧できたデータだけを新しいキーへ保存。旧キーは一切削除しない。
+localStorage.setItem(TK,JSON.stringify(tasks));
+localStorage.setItem(RK,JSON.stringify(repeats));
+localStorage.setItem(DK,JSON.stringify([...dismissed]));
 </script>
 </body>
 </html>
