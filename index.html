@@ -79,6 +79,19 @@ textarea{min-height:95px;resize:vertical}
 .calendar-reset{background:#f3f4f6;color:#111827}
 .calendar-ok{background:#2563eb;color:#fff}
 
+
+.photo-add-btn{width:100%;border:1px dashed #9ca3af;border-radius:11px;padding:13px;background:#fff;color:#111827;font-size:15px;font-weight:900;margin-top:8px}
+.photo-editor-grid,.task-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.photo-editor-item,.task-photo-item{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:#e5e7eb}
+.photo-editor-item img,.task-photo-item img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-remove{position:absolute;right:4px;top:4px;width:27px;height:27px;border:0;border-radius:50%;background:#111827;color:#fff;font-size:18px;font-weight:900;line-height:25px;padding:0}
+.photo-count{display:inline-flex;align-items:center;justify-content:center;margin-left:7px;min-width:30px;height:24px;padding:0 7px;border-radius:999px;background:#ffffffd9;color:#111827;font-size:12px;font-weight:900;vertical-align:middle}
+.task-photos-title{font-weight:900;margin:12px 0 6px}
+.photo-viewer{display:none;position:fixed;inset:0;z-index:120;background:#000e;align-items:center;justify-content:center;padding:18px}
+.photo-viewer.show{display:flex}.photo-viewer img{max-width:100%;max-height:88vh;border-radius:12px;object-fit:contain}
+.photo-viewer-close{position:absolute;right:18px;top:calc(18px + env(safe-area-inset-top));width:44px;height:44px;border:0;border-radius:50%;background:#fff;color:#111827;font-size:28px;font-weight:900}
+.photo-help{font-size:12px;color:#6b7280;margin-top:6px}
+
 </style>
 </head>
 <body>
@@ -96,6 +109,11 @@ textarea{min-height:95px;resize:vertical}
 <label>タスク名</label><input id="titleInput" placeholder="例：水質検査結果の確認">
 <label>期限</label><input id="dueInput" class="date-field" type="text" readonly placeholder="期限を選択">
 <label>補足説明</label><textarea id="noteInput" placeholder="作業内容や注意点など"></textarea>
+<label>写真</label>
+<div id="addPhotoPreview" class="photo-editor-grid"></div>
+<input id="addPhotoInput" type="file" accept="image/*" multiple hidden>
+<button id="addPhotoBtn" class="photo-add-btn" type="button">＋ 写真を追加（最大5枚）</button>
+<div class="photo-help">写真は端末内で縮小して保存します。</div>
 <button class="primary" id="addTaskBtn">追加する</button>
 </div></section>
 
@@ -125,6 +143,11 @@ textarea{min-height:95px;resize:vertical}
 </div>
 
 <label>補足説明</label><textarea id="repeatNote" placeholder="作業内容や注意点など"></textarea>
+<label>写真</label>
+<div id="repeatPhotoPreview" class="photo-editor-grid"></div>
+<input id="repeatPhotoInput" type="file" accept="image/*" multiple hidden>
+<button id="repeatPhotoBtn" class="photo-add-btn" type="button">＋ 写真を追加（最大5枚）</button>
+<div class="photo-help">登録した写真は、自動生成されるタスクへ引き継がれます。</div>
 <button class="primary" id="addRepeatBtn">登録する</button>
 </div><div id="repeatList"></div></section>
 </main>
@@ -134,10 +157,18 @@ textarea{min-height:95px;resize:vertical}
 <label>タスク名</label><input id="editTitle">
 <label>期限</label><input id="editDue" class="date-field" type="text" readonly placeholder="期限を選択">
 <label>補足説明</label><textarea id="editNote"></textarea>
+<label>写真</label>
+<div id="editPhotoPreview" class="photo-editor-grid"></div>
+<input id="editPhotoInput" type="file" accept="image/*" multiple hidden>
+<button id="editPhotoBtn" class="photo-add-btn" type="button">＋ 写真を追加（最大5枚）</button>
 <div class="modal-actions"><button id="cancelEdit" class="cancel">キャンセル</button><button id="saveEdit" class="save-btn">保存する</button></div>
 </div></div>
 
 
+<div id="photoViewer" class="photo-viewer">
+<button id="photoViewerClose" class="photo-viewer-close" type="button">×</button>
+<img id="photoViewerImage" alt="タスク写真">
+</div>
 <div id="calendarModal" class="calendar-backdrop">
   <div class="calendar-box">
     <div class="calendar-head">
@@ -183,6 +214,84 @@ const parse=s=>{const [y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}
 const clone=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
 const add=(d,n)=>{const x=clone(d);x.setDate(x.getDate()+n);return x};
 const diff=(a,b)=>Math.floor((clone(a)-clone(b))/86400000);
+
+const PHOTO_LIMIT=5,PHOTO_DB_NAME="taskToolPhotosV1",PHOTO_STORE="photos";
+let addPendingPhotos=[],editExistingPhotos=[],editPendingPhotos=[],editRemovedPhotoIds=new Set();
+
+const repeatPhotoDbPromise=new Promise((resolve,reject)=>{
+ const req=indexedDB.open(REPEAT_PHOTO_DB_NAME,1);
+ req.onupgradeneeded=()=>{
+  const db=req.result;
+  const store=db.createObjectStore(REPEAT_PHOTO_STORE,{keyPath:"id"});
+  store.createIndex("repeatId","repeatId",{unique:false});
+ };
+ req.onsuccess=()=>resolve(req.result);
+ req.onerror=()=>reject(req.error);
+});
+
+const photoDbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open(PHOTO_DB_NAME,1);req.onupgradeneeded=()=>{const db=req.result;const store=db.createObjectStore(PHOTO_STORE,{keyPath:"id"});store.createIndex("taskId","taskId",{unique:false})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)});
+
+async function getRepeatPhotos(repeatId){
+ const db=await repeatPhotoDbPromise;
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(REPEAT_PHOTO_STORE,"readonly");
+  const req=tx.objectStore(REPEAT_PHOTO_STORE).index("repeatId").getAll(repeatId);
+  req.onsuccess=()=>resolve(req.result.sort((a,b)=>a.createdAt-b.createdAt));
+  req.onerror=()=>reject(req.error);
+ });
+}
+async function storeRepeatPhoto(repeatId,data){
+ const db=await repeatPhotoDbPromise;
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(REPEAT_PHOTO_STORE,"readwrite");
+  tx.objectStore(REPEAT_PHOTO_STORE).put({
+   id:crypto.randomUUID(),repeatId,data,createdAt:Date.now()+Math.random()
+  });
+  tx.oncomplete=()=>resolve();
+  tx.onerror=()=>reject(tx.error);
+ });
+}
+async function removeRepeatPhoto(id){
+ const db=await repeatPhotoDbPromise;
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(REPEAT_PHOTO_STORE,"readwrite");
+  tx.objectStore(REPEAT_PHOTO_STORE).delete(id);
+  tx.oncomplete=()=>resolve();
+  tx.onerror=()=>reject(tx.error);
+ });
+}
+async function removeAllRepeatPhotos(repeatId){
+ const photos=await getRepeatPhotos(repeatId);
+ await Promise.all(photos.map(p=>removeRepeatPhoto(p.id)));
+}
+async function copyRepeatPhotosToTask(repeatId,taskId){
+ const photos=await getRepeatPhotos(repeatId);
+ for(const p of photos)await storePhoto(taskId,p.data);
+}
+
+async function getTaskPhotos(taskId){const db=await photoDbPromise;return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,"readonly");const req=tx.objectStore(PHOTO_STORE).index("taskId").getAll(taskId);req.onsuccess=()=>resolve(req.result.sort((a,b)=>a.createdAt-b.createdAt));req.onerror=()=>reject(req.error)})}
+async function storePhoto(taskId,data){const db=await photoDbPromise;return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,"readwrite");tx.objectStore(PHOTO_STORE).put({id:crypto.randomUUID(),taskId,data,createdAt:Date.now()+Math.random()});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function removePhoto(id){const db=await photoDbPromise;return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,"readwrite");tx.objectStore(PHOTO_STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function removeAllTaskPhotos(taskId){const photos=await getTaskPhotos(taskId);await Promise.all(photos.map(p=>removePhoto(p.id)))}
+function compressPhoto(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(reader.error);reader.onload=()=>{const img=new Image();img.onerror=()=>reject(new Error("画像を読み込めませんでした"));img.onload=()=>{const maxSide=1000,scale=Math.min(1,maxSide/Math.max(img.width,img.height)),canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));canvas.getContext("2d").drawImage(img,0,0,canvas.width,canvas.height);resolve(canvas.toDataURL("image/jpeg",0.74))};img.src=reader.result};reader.readAsDataURL(file)})}
+async function filesToCompressed(files,remaining){const result=[];for(const file of [...files].slice(0,remaining)){if(file.type.startsWith("image/"))result.push(await compressPhoto(file))}return result}
+function photoEditorItem(src,onRemove){const item=document.createElement("div");item.className="photo-editor-item";const img=document.createElement("img");img.src=src;const btn=document.createElement("button");btn.type="button";btn.className="photo-remove";btn.textContent="×";btn.onclick=onRemove;item.append(img,btn);return item}
+function renderAddPhotoPreview(){const box=$("addPhotoPreview");box.innerHTML="";addPendingPhotos.forEach((src,i)=>box.appendChild(photoEditorItem(src,()=>{addPendingPhotos.splice(i,1);renderAddPhotoPreview()})));$("addPhotoBtn").disabled=addPendingPhotos.length>=PHOTO_LIMIT}
+
+function renderRepeatPhotoPreview(){
+ const box=$("repeatPhotoPreview");box.innerHTML="";
+ repeatPendingPhotos.forEach((src,i)=>{
+  box.appendChild(photoEditorItem(src,()=>{
+   repeatPendingPhotos.splice(i,1);renderRepeatPhotoPreview();
+  }));
+ });
+ $("repeatPhotoBtn").disabled=repeatPendingPhotos.length>=PHOTO_LIMIT;
+}
+
+function renderEditPhotoPreview(){const box=$("editPhotoPreview");box.innerHTML="";editExistingPhotos.forEach(p=>box.appendChild(photoEditorItem(p.data,()=>{editRemovedPhotoIds.add(p.id);editExistingPhotos=editExistingPhotos.filter(x=>x.id!==p.id);renderEditPhotoPreview()})));editPendingPhotos.forEach((src,i)=>box.appendChild(photoEditorItem(src,()=>{editPendingPhotos.splice(i,1);renderEditPhotoPreview()})));$("editPhotoBtn").disabled=(editExistingPhotos.length+editPendingPhotos.length)>=PHOTO_LIMIT}
+function openPhotoViewer(src){$("photoViewerImage").src=src;$("photoViewer").classList.add("show")}
+function closePhotoViewer(){$("photoViewer").classList.remove("show");$("photoViewerImage").src=""}
+$("photoViewerClose").onclick=closePhotoViewer;$("photoViewer").onclick=e=>{if(e.target===$("photoViewer"))closePhotoViewer()};
 
 function save(){
  localStorage.setItem(TK,JSON.stringify(tasks));
@@ -241,7 +350,9 @@ function generate(){
  repeats.forEach(r=>{
   const {target,period}=targetFor(r,today),key=`${r.id}-${period}`;
   if(target<=today&&!dismissed.has(key)&&!tasks.some(t=>t.occurrenceKey===key)){
-   tasks.push({id:crypto.randomUUID(),title:r.title,due:dateKey(target),note:r.note||"",completed:false,kind:"recurring",repeatType:r.type,appearedAt:dateKey(target),occurrenceKey:key});
+   const newTask={id:crypto.randomUUID(),title:r.title,due:dateKey(target),note:r.note||"",completed:false,kind:"recurring",repeatType:r.type,appearedAt:dateKey(target),occurrenceKey:key};
+   tasks.push(newTask);
+   copyRepeatPhotosToTask(r.id,newTask.id).catch(()=>{});
    changed=true;
   }
  });
@@ -258,19 +369,38 @@ function taskColor(t){
 }
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
-function openEdit(t){editingId=t.id;$("editTitle").value=t.title;$("editDue").value=t.due||"";$("editNote").value=t.note||"";$("editModal").classList.add("show")}
+
+$("addPhotoBtn").onclick=()=>$("addPhotoInput").click();
+$("addPhotoInput").onchange=async e=>{const remaining=PHOTO_LIMIT-addPendingPhotos.length;if(remaining<=0)return;try{addPendingPhotos.push(...await filesToCompressed(e.target.files,remaining));renderAddPhotoPreview()}catch(err){alert("写真を読み込めませんでした")}e.target.value=""};
+
+$("repeatPhotoBtn").onclick=()=>$("repeatPhotoInput").click();
+$("repeatPhotoInput").onchange=async e=>{
+ const remaining=PHOTO_LIMIT-repeatPendingPhotos.length;
+ if(remaining<=0)return;
+ try{
+  repeatPendingPhotos.push(...await filesToCompressed(e.target.files,remaining));
+  renderRepeatPhotoPreview();
+ }catch(err){alert("写真を読み込めませんでした")}
+ e.target.value="";
+};
+
+$("editPhotoBtn").onclick=()=>$("editPhotoInput").click();
+$("editPhotoInput").onchange=async e=>{const remaining=PHOTO_LIMIT-editExistingPhotos.length-editPendingPhotos.length;if(remaining<=0)return;try{editPendingPhotos.push(...await filesToCompressed(e.target.files,remaining));renderEditPhotoPreview()}catch(err){alert("写真を読み込めませんでした")}e.target.value=""};
+
+async function openEdit(t){editingId=t.id;$("editTitle").value=t.title;$("editDue").value=t.due||"";$("editNote").value=t.note||"";editPendingPhotos=[];editRemovedPhotoIds=new Set();try{editExistingPhotos=await getTaskPhotos(t.id)}catch(e){editExistingPhotos=[]}renderEditPhotoPreview();$("editModal").classList.add("show")}
 function closeEdit(){editingId=null;$("editModal").classList.remove("show")}
 $("cancelEdit").onclick=closeEdit;
 $("editModal").onclick=e=>{if(e.target===$("editModal"))closeEdit()};
-$("saveEdit").onclick=()=>{
+$("saveEdit").onclick=async()=>{
  const t=tasks.find(x=>x.id===editingId);if(!t)return closeEdit();
  const title=$("editTitle").value.trim();if(!title)return alert("タスク名を入力してください");
- t.title=title;t.due=$("editDue").value;t.note=$("editNote").value.trim();save();closeEdit();renderTasks();
+ t.title=title;t.due=$("editDue").value;t.note=$("editNote").value.trim();
+ try{await Promise.all([...editRemovedPhotoIds].map(id=>removePhoto(id)));for(const data of editPendingPhotos)await storePhoto(t.id,data)}catch(e){alert("写真の保存に失敗しました。Safariの空き容量を確認してください。")}save();closeEdit();renderTasks();
 };
 
-function deleteTask(t){
+async function deleteTask(t){
  if(t.occurrenceKey)dismissed.add(t.occurrenceKey);
- tasks=tasks.filter(x=>x.id!==t.id);save();renderTasks();
+ tasks=tasks.filter(x=>x.id!==t.id);try{await removeAllTaskPhotos(t.id)}catch(e){}save();renderTasks();
 }
 function renderTasks(){
  generate();const list=$("taskList"),active=tasks.filter(t=>!t.completed);
@@ -289,11 +419,12 @@ function renderTasks(){
   c.className=`task-card ${color}`;
   const badge=t.kind==="recurring"?`<span class="badge">${t.repeatType==="weekly"?"週例":"月例"}</span>`:"";
   const dueText=color==="red"?"":`<div class="task-meta">期限：${t.due||"未設定"}</div>`;
-  c.innerHTML=`<div class="task-title">${esc(t.title)}${badge}</div>${dueText}
+  c.innerHTML=`<div class="task-title">${esc(t.title)}${badge}<span class="photo-count" data-photo-count="${t.id}" style="display:none">📷 0</span></div>${dueText}
   <div class="detail">${t.kind==="recurring"?`<div>出現日：${t.appearedAt}</div>`:""}<div><strong>補足：</strong></div>
-  <div class="task-note">${esc(t.note||"なし")}</div><div class="actions">
+  <div class="task-note">${esc(t.note||"なし")}</div><div class="task-photo-area" data-photo-area="${t.id}"></div><div class="actions">
   <button class="small-btn complete" type="button">完了</button><button class="small-btn edit" type="button">編集</button></div></div>`;
   w.appendChild(c);list.appendChild(w);
+  getTaskPhotos(t.id).then(photos=>{if(!photos.length)return;const count=c.querySelector(`[data-photo-count="${t.id}"]`);count.textContent=`📷 ${photos.length}`;count.style.display="inline-flex";const area=c.querySelector(`[data-photo-area="${t.id}"]`);const title=document.createElement("div");title.className="task-photos-title";title.textContent=`写真（${photos.length}枚）`;const grid=document.createElement("div");grid.className="task-photo-grid";photos.forEach(p=>{const item=document.createElement("div");item.className="task-photo-item";const img=document.createElement("img");img.src=p.data;img.onclick=e=>{e.stopPropagation();openPhotoViewer(p.data)};item.appendChild(img);grid.appendChild(item)});area.append(title,grid)}).catch(()=>{});
   let sx=0,sy=0,moved=false,swipeBlocked=false,swipeActive=false;
   c.ontouchstart=e=>{
    swipeBlocked=c.classList.contains("open");
@@ -342,20 +473,29 @@ function renderTasks(){
   c.querySelector(".edit").onclick=e=>{e.stopPropagation();openEdit(t)};
  });
 }
-$("addTaskBtn").onclick=()=>{
+$("addTaskBtn").onclick=async()=>{
  const title=$("titleInput").value.trim();if(!title)return alert("タスク名を入力してください");
- tasks.push({id:crypto.randomUUID(),title,due:$("dueInput").value,note:$("noteInput").value.trim(),completed:false,kind:"normal",createdAt:dateKey(new Date())});
- save();$("titleInput").value=$("dueInput").value=$("noteInput").value="";renderTasks();showTab("tasks");
+ const task={id:crypto.randomUUID(),title,due:$("dueInput").value,note:$("noteInput").value.trim(),completed:false,kind:"normal",createdAt:dateKey(new Date())};tasks.push(task);
+ try{for(const data of addPendingPhotos)await storePhoto(task.id,data)}catch(e){alert("写真の保存に失敗しました。Safariの空き容量を確認してください。")}save();$("titleInput").value=$("dueInput").value=$("noteInput").value="";addPendingPhotos=[];renderAddPhotoPreview();renderTasks();showTab("tasks");
 };
 
 $("repeatType").onchange=()=>{
  const weekly=$("repeatType").value==="weekly";
  $("weeklyRule").classList.toggle("hidden",!weekly);$("monthlyRule").classList.toggle("hidden",weekly);
 };
-$("addRepeatBtn").onclick=()=>{
+$("addRepeatBtn").onclick=async()=>{
  const title=$("repeatTitle").value.trim();if(!title)return alert("タスク名を入力してください");
- repeats.push({id:crypto.randomUUID(),title,type:$("repeatType").value,note:$("repeatNote").value.trim(),weeklyDay:$("weeklyDay").value,monthlyMode:$("monthlyMode").value});
- save();$("repeatTitle").value=$("repeatNote").value="";renderRepeats();renderTasks();
+ const repeat={id:crypto.randomUUID(),title,type:$("repeatType").value,note:$("repeatNote").value.trim(),weeklyDay:$("weeklyDay").value,monthlyMode:$("monthlyMode").value};
+ repeats.push(repeat);
+ try{
+  for(const data of repeatPendingPhotos)await storeRepeatPhoto(repeat.id,data);
+ }catch(e){
+  alert("写真の保存に失敗しました。Safariの空き容量を確認してください。");
+ }
+ save();
+ $("repeatTitle").value=$("repeatNote").value="";
+ repeatPendingPhotos=[];renderRepeatPhotoPreview();
+ renderRepeats();renderTasks();
 };
 const dayNames={"1":"月曜日","2":"火曜日","3":"水曜日","4":"木曜日","5":"金曜日"};
 const modeNames={first_business:"毎月1日を基準",second_monday:"第2月曜日",third_monday:"第3月曜日",day15:"毎月15日",last_business:"月末営業日"};
@@ -371,13 +511,23 @@ function renderRepeats(){
  sortedRepeats.forEach(r=>{
   const d=document.createElement("div");d.className="repeat-item";
   const rule=r.type==="weekly"?`週例・${dayNames[r.weeklyDay]||"月曜日"}`:`月例・${modeNames[r.monthlyMode]||modeNames.first_business}`;
-  d.innerHTML=`<div class="repeat-title">${esc(r.title)}</div><div class="repeat-meta">${rule}</div>${r.note?`<div class="repeat-note">${esc(r.note)}</div>`:""}
+  d.innerHTML=`<div class="repeat-title">${esc(r.title)}<span class="photo-count" data-repeat-photo-count="${r.id}" style="display:none">📷 0</span></div><div class="repeat-meta">${rule}</div>${r.note?`<div class="repeat-note">${esc(r.note)}</div>`:""}
   <div class="repeat-actions"><button class="secondary">編集</button><button class="danger">削除</button></div>`;
+  getRepeatPhotos(r.id).then(photos=>{
+   if(!photos.length)return;
+   const count=d.querySelector(`[data-repeat-photo-count="${r.id}"]`);
+   count.textContent=`📷 ${photos.length}`;
+   count.style.display="inline-flex";
+  }).catch(()=>{});
   d.querySelector(".secondary").onclick=()=>{
    const title=prompt("タスク名",r.title);if(title===null||!title.trim())return;
    const note=prompt("補足説明",r.note||"");r.title=title.trim();if(note!==null)r.note=note.trim();save();renderRepeats();
   };
-  d.querySelector(".danger").onclick=()=>{repeats=repeats.filter(x=>x.id!==r.id);save();renderRepeats()};
+  d.querySelector(".danger").onclick=async()=>{
+   repeats=repeats.filter(x=>x.id!==r.id);
+   try{await removeAllRepeatPhotos(r.id)}catch(e){}
+   save();renderRepeats()
+  };
   box.appendChild(d);
  });
 }
@@ -443,6 +593,8 @@ $("calendarModal").addEventListener("click",e=>{
  if(e.target===$("calendarModal"))closeCalendar();
 });
 
+renderAddPhotoPreview();
+renderRepeatPhotoPreview();
 save();generate();renderTasks();renderRepeats();
 </script>
 </body>
