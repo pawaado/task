@@ -188,30 +188,14 @@ textarea{min-height:95px;resize:vertical}
 </div>
 
 <script>
-const TK="taskToolTasksV14";
-const RK="taskToolRepeatsV14";
-const DK="taskToolDismissedV14";
+const TK="taskToolTasksV16";
+const RK="taskToolRepeatsV16";
+const DK="taskToolDismissedV16";
+const MIGRATION_KEY="taskToolMigrationV16Done";
 
-const taskKeys=[
- TK,
- "taskToolTasksV5",
- "taskToolTasksV4",
- "taskToolTasksV3",
- "taskToolTasksV2",
- "tasks"
-];
-const repeatKeys=[
- RK,
- "taskToolRepeatsV5",
- "taskToolRepeatsV4",
- "taskToolRepeatsV3",
- "taskToolRepeatsV2",
- "repeats"
-];
-const dismissedKeys=[
- DK,
- "taskToolDismissedV5"
-];
+const taskKeys=["taskToolTasksV14","taskToolTasksV5","taskToolTasksV4","taskToolTasksV3","taskToolTasksV2","tasks"];
+const repeatKeys=["taskToolRepeatsV14","taskToolRepeatsV5","taskToolRepeatsV4","taskToolRepeatsV3","taskToolRepeatsV2","repeats"];
+const dismissedKeys=["taskToolDismissedV14","taskToolDismissedV5"];
 
 function safeArrayFromKey(key){
  const raw=localStorage.getItem(key);
@@ -219,9 +203,7 @@ function safeArrayFromKey(key){
  try{
   const parsed=JSON.parse(raw);
   return Array.isArray(parsed)?parsed:[];
- }catch(e){
-  return [];
- }
+ }catch(e){return []}
 }
 function bestStoredArray(keys){
  let best=[];
@@ -231,32 +213,42 @@ function bestStoredArray(keys){
  }
  return best;
 }
+function normalizeTask(t){
+ return {...t,id:t.id||crypto.randomUUID(),title:t.title||t.name||"",due:t.due||"",note:t.note||"",completed:!!t.completed,kind:t.kind||"normal"};
+}
+function normalizeRepeat(r){
+ return {id:r.id||crypto.randomUUID(),title:r.title||"",type:r.type==="monthly"?"monthly":"weekly",note:r.note||"",weeklyDay:String(r.weeklyDay??r.weekday??1),monthlyMode:r.monthlyMode||"first_business"};
+}
+function repeatSignature(r){
+ return [(r.title||"").trim(),r.type||"weekly",String(r.weeklyDay||"1"),r.monthlyMode||"first_business",(r.note||"").trim()].join("||");
+}
+function dedupeRepeats(list){
+ const seen=new Set(),result=[];
+ for(const item of list){
+  const r=normalizeRepeat(item),sig=repeatSignature(r);
+  if(seen.has(sig))continue;
+  seen.add(sig);result.push(r);
+ }
+ return result;
+}
 
+let tasks;
+let repeats;
+let dismissed;
 
-const recoveredFromOldKey =
- localStorage.getItem("taskToolTasksV14")===null &&
- taskKeys.slice(1).some(k=>safeArrayFromKey(k).length>0);
-
-let tasks=bestStoredArray(taskKeys).map(t=>({
- ...t,
- id:t.id||crypto.randomUUID(),
- title:t.title||t.name||"",
- due:t.due||"",
- note:t.note||"",
- completed:!!t.completed,
- kind:t.kind||"normal"
-}));
-
-let repeats=bestStoredArray(repeatKeys).map(r=>({
- id:r.id||crypto.randomUUID(),
- title:r.title||"",
- type:r.type==="monthly"?"monthly":"weekly",
- note:r.note||"",
- weeklyDay:String(r.weeklyDay??r.weekday??1),
- monthlyMode:r.monthlyMode||"first_business"
-}));
-
-let dismissed=new Set(bestStoredArray(dismissedKeys));
+if(localStorage.getItem(MIGRATION_KEY)==="1"){
+ tasks=safeArrayFromKey(TK).map(normalizeTask);
+ repeats=dedupeRepeats(safeArrayFromKey(RK));
+ dismissed=new Set(safeArrayFromKey(DK));
+}else{
+ tasks=bestStoredArray(taskKeys).map(normalizeTask);
+ repeats=dedupeRepeats(bestStoredArray(repeatKeys));
+ dismissed=new Set(bestStoredArray(dismissedKeys));
+ localStorage.setItem(TK,JSON.stringify(tasks));
+ localStorage.setItem(RK,JSON.stringify(repeats));
+ localStorage.setItem(DK,JSON.stringify([...dismissed]));
+ localStorage.setItem(MIGRATION_KEY,"1");
+}
 let editingId=null;
 const $=id=>document.getElementById(id),pad=n=>String(n).padStart(2,"0");
 const dateKey=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -346,9 +338,11 @@ function closePhotoViewer(){$("photoViewer").classList.remove("show");$("photoVi
 $("photoViewerClose").onclick=closePhotoViewer;$("photoViewer").onclick=e=>{if(e.target===$("photoViewer"))closePhotoViewer()};
 
 function save(){
+ repeats=dedupeRepeats(repeats);
  localStorage.setItem(TK,JSON.stringify(tasks));
  localStorage.setItem(RK,JSON.stringify(repeats));
  localStorage.setItem(DK,JSON.stringify([...dismissed]));
+ localStorage.setItem(MIGRATION_KEY,"1");
 }
 function showTab(n){
  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===n));
@@ -658,17 +652,10 @@ $("calendarModal").addEventListener("click",e=>{
 
 renderAddPhotoPreview();
 renderRepeatPhotoPreview();
+save();
 generate();
 renderTasks();
 renderRepeats();
-
-if(recoveredFromOldKey && tasks.length){
- setTimeout(()=>alert(`保存されていたタスクを${tasks.length}件復旧しました。`),100);
-}
-// 復旧できたデータだけを新しいキーへ保存。旧キーは一切削除しない。
-localStorage.setItem(TK,JSON.stringify(tasks));
-localStorage.setItem(RK,JSON.stringify(repeats));
-localStorage.setItem(DK,JSON.stringify([...dismissed]));
 </script>
 </body>
 </html>
