@@ -1,4 +1,9 @@
 <!DOCTYPE html>
+<!--
+登録したタスク、補足、期限、週例・月例設定、写真は、この端末のブラウザ内にのみ保存されます。
+HTMLソースには利用者の登録内容を埋め込みません。
+新しい端末や別の利用者が開いた場合は、空の状態から始まります。
+-->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -119,7 +124,7 @@ textarea{min-height:95px;resize:vertical}
 
 <section id="repeat" class="panel"><div class="form">
 <h2>週例・月例を登録</h2>
-<label>タスク名</label><input id="repeatTitle" placeholder="例：pH計校正">
+<label>タスク名</label><input id="repeatTitle" placeholder="例：定期点検">
 <label>種類</label>
 <select id="repeatType"><option value="weekly">週例</option><option value="monthly">月例</option></select>
 
@@ -188,14 +193,14 @@ textarea{min-height:95px;resize:vertical}
 </div>
 
 <script>
-const TK="taskToolTasksV16";
-const RK="taskToolRepeatsV16";
-const DK="taskToolDismissedV16";
-const MIGRATION_KEY="taskToolMigrationV16Done";
+const TK="taskToolTasksV17";
+const RK="taskToolRepeatsV17";
+const DK="taskToolDismissedV17";
+const MIGRATION_KEY="taskToolMigrationV17Done";
 
-const taskKeys=["taskToolTasksV14","taskToolTasksV5","taskToolTasksV4","taskToolTasksV3","taskToolTasksV2","tasks"];
-const repeatKeys=["taskToolRepeatsV14","taskToolRepeatsV5","taskToolRepeatsV4","taskToolRepeatsV3","taskToolRepeatsV2","repeats"];
-const dismissedKeys=["taskToolDismissedV14","taskToolDismissedV5"];
+const taskKeys=["taskToolTasksV16","taskToolTasksV14","taskToolTasksV5","taskToolTasksV4","taskToolTasksV3","taskToolTasksV2","tasks"];
+const repeatKeys=["taskToolRepeatsV16","taskToolRepeatsV14","taskToolRepeatsV5","taskToolRepeatsV4","taskToolRepeatsV3","taskToolRepeatsV2","repeats"];
+const dismissedKeys=["taskToolDismissedV16","taskToolDismissedV14","taskToolDismissedV5"];
 
 function safeArrayFromKey(key){
  const raw=localStorage.getItem(key);
