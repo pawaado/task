@@ -14,8 +14,8 @@ HTMLソースには利用者の登録内容を埋め込みません。
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
 header{position:sticky;top:0;z-index:10;background:#fff;padding:14px 14px 10px;box-shadow:0 2px 10px #00000014}
-h1{font-size:22px;margin:0 0 10px}.tabs{display:flex;gap:8px}
-.tab{flex:1;border:0;border-radius:10px;padding:11px 8px;font-size:15px;font-weight:800;background:#e5e7eb;color:#374151}
+h1{font-size:22px;margin:0 0 10px}.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.tab{min-width:0;border:0;border-radius:10px;padding:11px 2px;font-size:clamp(12px,3.4vw,14px);font-weight:800;background:#e5e7eb;color:#374151;white-space:nowrap}
 .tab.active{background:#111827;color:#fff}
 main{padding:14px 14px 90px}.panel{display:none}.panel.active{display:block}
 .form{background:#fff;border-radius:14px;padding:14px;box-shadow:0 2px 8px #00000014;margin-bottom:14px}
@@ -42,6 +42,22 @@ textarea{min-height:95px;resize:vertical}
 .repeat-note{font-size:14px;margin-top:8px;white-space:pre-wrap;word-break:break-word}
 .repeat-actions{display:flex;gap:8px;margin-top:11px}.repeat-actions button{flex:1;border:0;border-radius:8px;padding:10px;font-weight:800}
 .secondary{background:#e5e7eb;color:#111827}.danger{background:#fee2e2;color:#991b1b}
+.archive-list{display:flex;flex-direction:column;gap:10px}
+.archive-card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px #00000014}
+.archive-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.archive-title{font-size:19px;font-weight:900;line-height:1.35;word-break:break-word}
+.archive-status{flex:0 0 auto;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:900;background:#e5e7eb;color:#374151}
+.archive-status.deleted{background:#fee2e2;color:#991b1b}
+.archive-meta{margin-top:7px;font-size:14px;color:#6b7280;line-height:1.6}
+.archive-note{margin-top:8px;padding-top:8px;border-top:1px solid #e5e7eb;white-space:pre-wrap;word-break:break-word;font-size:14px;line-height:1.55}
+.restore-btn{width:100%;margin-top:12px;border:0;border-radius:10px;padding:12px;font-size:15px;font-weight:900;background:#111827;color:#fff}
+.archive-info{background:#fff;border-radius:14px;padding:13px 14px;margin-bottom:12px;color:#4b5563;font-size:13px;line-height:1.55;box-shadow:0 2px 8px #0000000d}
+.legacy-section{margin-top:20px;padding-top:16px;border-top:1px solid #d1d5db}
+.legacy-title{font-size:17px;font-weight:900;margin-bottom:6px}
+.legacy-help{font-size:13px;color:#6b7280;line-height:1.55;margin-bottom:10px}
+.legacy-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:13px;margin-bottom:9px}
+.legacy-card .archive-title{font-size:16px}
+
 .hidden{display:none}
 .modal-backdrop{display:none;position:fixed;inset:0;z-index:50;background:#00000073;align-items:flex-end;justify-content:center}
 .modal-backdrop.show{display:flex}.modal{width:100%;max-width:600px;background:#fff;border-radius:18px 18px 0 0;padding:20px 16px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -5px 24px #0003}
@@ -104,6 +120,7 @@ textarea{min-height:95px;resize:vertical}
 <button class="tab active" data-tab="tasks">タスク</button>
 <button class="tab" data-tab="add">追加</button>
 <button class="tab" data-tab="repeat">週例・月例</button>
+<button class="tab" data-tab="completed">完了済</button>
 </div></header>
 
 <main>
@@ -155,6 +172,12 @@ textarea{min-height:95px;resize:vertical}
 <div class="photo-help">登録した写真は、自動生成されるタスクへ引き継がれます。</div>
 <button class="primary" id="addRepeatBtn">登録する</button>
 </div><div id="repeatList"></div></section>
+
+<section id="completed" class="panel">
+<div class="archive-info">完了・削除したタスクはここに7日間残ります。必要なら「復活」でタスク一覧へ戻せます。</div>
+<div id="completedList" class="archive-list"></div>
+<div id="legacyRecovery" class="legacy-section"></div>
+</section>
 </main>
 
 <div id="editModal" class="modal-backdrop"><div class="modal">
@@ -197,6 +220,7 @@ const TK="taskToolTasksV17";
 const RK="taskToolRepeatsV17";
 const DK="taskToolDismissedV17";
 const MIGRATION_KEY="taskToolMigrationV17Done";
+const ARCHIVE_KEEP_MS=7*24*60*60*1000;
 
 const taskKeys=["taskToolTasksV16","taskToolTasksV14","taskToolTasksV5","taskToolTasksV4","taskToolTasksV3","taskToolTasksV2","tasks"];
 const repeatKeys=["taskToolRepeatsV16","taskToolRepeatsV14","taskToolRepeatsV5","taskToolRepeatsV4","taskToolRepeatsV3","taskToolRepeatsV2","repeats"];
@@ -352,6 +376,7 @@ function save(){
 function showTab(n){
  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===n));
  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===n));
+ if(n==="completed")renderCompleted();
 }
 document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
@@ -420,6 +445,95 @@ function taskColor(t){
 }
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
+function archiveLabel(t){return t.archiveReason==="deleted"?"削除":"完了"}
+function formatArchiveTime(ms){
+ const d=new Date(Number(ms)||Date.now());
+ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function ensureArchiveMetadata(){
+ let changed=false;
+ tasks.forEach(t=>{
+  if(t.completed&&!t.archivedAt){t.archivedAt=Date.now();t.archiveReason=t.archiveReason||"completed";changed=true}
+ });
+ if(changed)save();
+}
+function purgeExpiredArchivedTasks(){
+ const now=Date.now(),expired=tasks.filter(t=>t.completed&&t.archivedAt&&(now-Number(t.archivedAt)>=ARCHIVE_KEEP_MS));
+ if(!expired.length)return;
+ const ids=new Set(expired.map(t=>t.id));
+ expired.forEach(t=>{if(t.occurrenceKey)dismissed.add(t.occurrenceKey);removeAllTaskPhotos(t.id).catch(()=>{})});
+ tasks=tasks.filter(t=>!ids.has(t.id));
+ save();
+}
+function archiveTask(t,reason){
+ t.completed=true;
+ t.archivedAt=Date.now();
+ t.archiveReason=reason;
+ if(t.occurrenceKey)dismissed.add(t.occurrenceKey);
+ save();renderTasks();renderCompleted();
+}
+function restoreTask(t){
+ t.completed=false;
+ delete t.archivedAt;
+ delete t.archiveReason;
+ if(t.occurrenceKey)dismissed.delete(t.occurrenceKey);
+ save();renderTasks();renderCompleted();
+}
+function legacyTaskSignature(t){
+ return [(t.title||"").trim(),t.due||"",(t.note||"").trim(),t.occurrenceKey||""].join("||");
+}
+function legacyRecoveryCandidates(){
+ const currentIds=new Set(tasks.map(t=>t.id));
+ const currentSigs=new Set(tasks.map(legacyTaskSignature));
+ const seen=new Set(),out=[];
+ for(const key of taskKeys){
+  for(const raw of safeArrayFromKey(key)){
+   const t=normalizeTask(raw);
+   if(t.completed)continue;
+   const sig=legacyTaskSignature(t);
+   if(currentIds.has(t.id)||currentSigs.has(sig)||seen.has(sig))continue;
+   seen.add(sig);out.push(t);
+  }
+ }
+ out.sort((a,b)=>{
+  const ad=a.due?parse(a.due).getTime():0,bd=b.due?parse(b.due).getTime():0;
+  return bd-ad;
+ });
+ return out.slice(0,30);
+}
+function restoreLegacyTask(t){
+ const restored={...t,completed:false};
+ delete restored.archivedAt;delete restored.archiveReason;
+ if(tasks.some(x=>x.id===restored.id))restored.id=crypto.randomUUID();
+ if(restored.occurrenceKey)dismissed.delete(restored.occurrenceKey);
+ tasks.push(restored);save();renderTasks();renderCompleted();
+}
+function renderCompleted(){
+ purgeExpiredArchivedTasks();
+ const box=$("completedList"),archived=tasks.filter(t=>t.completed&&t.archivedAt).sort((a,b)=>Number(b.archivedAt)-Number(a.archivedAt));
+ box.innerHTML="";
+ if(!archived.length){box.innerHTML='<div class="empty">直近7日間の完了・削除タスクはありません</div>'}
+ archived.forEach(t=>{
+  const d=document.createElement("div");d.className="archive-card";
+  const reason=archiveLabel(t),remaining=Math.max(1,Math.ceil((ARCHIVE_KEEP_MS-(Date.now()-Number(t.archivedAt)))/86400000));
+  d.innerHTML=`<div class="archive-head"><div class="archive-title">${esc(t.title)}</div><span class="archive-status ${t.archiveReason==="deleted"?"deleted":""}">${reason}</span></div>
+  <div class="archive-meta">期限：${esc(t.due||"未設定")}<br>${reason}：${formatArchiveTime(t.archivedAt)}<br>自動削除まで：約${remaining}日</div>
+  ${t.note?`<div class="archive-note">${esc(t.note)}</div>`:""}
+  <button class="restore-btn" type="button">復活</button>`;
+  d.querySelector(".restore-btn").onclick=()=>restoreTask(t);
+  box.appendChild(d);
+ });
+ const legacy=$("legacyRecovery"),candidates=legacyRecoveryCandidates();
+ if(!candidates.length){legacy.innerHTML="";return}
+ legacy.innerHTML='<div class="legacy-title">旧データから復元候補</div><div class="legacy-help">以前の保存データに残っていて、現在の一覧にないタスクです。今回消したタスクがあればここから復活できます。</div>';
+ candidates.forEach(t=>{
+  const d=document.createElement("div");d.className="legacy-card";
+  d.innerHTML=`<div class="archive-title">${esc(t.title)}</div><div class="archive-meta">期限：${esc(t.due||"未設定")}</div><button class="restore-btn" type="button">このタスクを復活</button>`;
+  d.querySelector(".restore-btn").onclick=()=>restoreLegacyTask(t);legacy.appendChild(d);
+ });
+}
+
+
 
 $("addPhotoBtn").onclick=()=>$("addPhotoInput").click();
 $("addPhotoInput").onchange=async e=>{const remaining=PHOTO_LIMIT-addPendingPhotos.length;if(remaining<=0)return;try{addPendingPhotos.push(...await filesToCompressed(e.target.files,remaining));renderAddPhotoPreview()}catch(err){alert("写真を読み込めませんでした")}e.target.value=""};
@@ -449,9 +563,8 @@ $("saveEdit").onclick=async()=>{
  try{await Promise.all([...editRemovedPhotoIds].map(id=>removePhoto(id)));for(const data of editPendingPhotos)await storePhoto(t.id,data)}catch(e){alert("写真の保存に失敗しました。Safariの空き容量を確認してください。")}save();closeEdit();renderTasks();
 };
 
-async function deleteTask(t){
- if(t.occurrenceKey)dismissed.add(t.occurrenceKey);
- tasks=tasks.filter(x=>x.id!==t.id);try{await removeAllTaskPhotos(t.id)}catch(e){}save();renderTasks();
+function deleteTask(t){
+ archiveTask(t,"deleted");
 }
 function renderTasks(){
  generate();const list=$("taskList"),active=tasks.filter(t=>!t.completed);
@@ -520,7 +633,7 @@ function renderTasks(){
   };
   c.onclick=e=>{if(!e.target.closest(".small-btn")){c.style.transform="translateX(0)";c.classList.toggle("open")}};
   w.querySelector(".delete-bg").onclick=()=>deleteTask(t);
-  c.querySelector(".complete").onclick=e=>{e.stopPropagation();t.completed=true;save();renderTasks()};
+  c.querySelector(".complete").onclick=e=>{e.stopPropagation();archiveTask(t,"completed")};
   c.querySelector(".edit").onclick=e=>{e.stopPropagation();openEdit(t)};
  });
 }
@@ -657,10 +770,13 @@ $("calendarModal").addEventListener("click",e=>{
 
 renderAddPhotoPreview();
 renderRepeatPhotoPreview();
+ensureArchiveMetadata();
+purgeExpiredArchivedTasks();
 save();
 generate();
 renderTasks();
 renderRepeats();
+renderCompleted();
 </script>
 </body>
 </html>
