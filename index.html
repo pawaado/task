@@ -442,7 +442,7 @@ function taskColor(t){
  const due=parse(t.due);
  const days=diff(due,today);
  if(days===0)return "red";
- if(days>=1&&days<=3)return "yellow";
+ if(days<=3)return "yellow";
  return "green";
 }
 function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
@@ -571,10 +571,9 @@ function deleteTask(t){
 function renderTasks(){
  generate();const list=$("taskList"),active=tasks.filter(t=>!t.completed);
  active.sort((a,b)=>{
-  const order={red:0,yellow:1,green:2};
-  const ac=taskColor(a),bc=taskColor(b);
-  if(order[ac]!==order[bc])return order[ac]-order[bc];
-  return(a.due?parse(a.due):Infinity)-(b.due?parse(b.due):Infinity);
+  if(!a.due)return b.due?1:0;
+  if(!b.due)return -1;
+  return parse(a.due)-parse(b.due);
  });
  if(!active.length){list.innerHTML='<div class="empty">未完了のタスクはありません</div>';return}
  list.innerHTML="";
